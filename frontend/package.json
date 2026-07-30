@@ -9,8 +9,12 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
+  "overrides": {
+    "react": "$react",
+    "react-dom": "$react-dom"
+  },
   "dependencies": {
-    "apexcharts": "^3.46.0",
+    "apexcharts": "^6.6.1",
     "axios": "^1.6.8",
     "clsx": "^2.1.0",
     "country-state-city": "^3.2.1",
