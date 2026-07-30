@@ -1,0 +1,48 @@
+import React from "react";
+import { 
+  Home, 
+  BarChart2, 
+  CheckSquare, 
+  Activity, 
+  Info, 
+  Cpu, 
+  ChevronDown, 
+  Lock, 
+  User, 
+  FileText, 
+  History, 
+  MessageSquare, 
+  Settings, 
+  Sliders, 
+  ShieldCheck, 
+  Moon, 
+  Sun,
+  Loader2,
+  Trash2,
+  Share2,
+  Download
+} from "lucide-react";
+
+export const Icons = {
+  Home: (props: any) => <Home {...props} />,
+  Analytics: (props: any) => <BarChart2 {...props} />,
+  Evaluation: (props: any) => <CheckSquare {...props} />,
+  Performance: (props: any) => <Activity {...props} />,
+  Info: (props: any) => <Info {...props} />,
+  Cpu: (props: any) => <Cpu {...props} />,
+  DropdownArrow: (props: any) => <ChevronDown {...props} />,
+  Lock: (props: any) => <Lock {...props} />,
+  User: (props: any) => <User {...props} />,
+  Document: (props: any) => <FileText {...props} />,
+  History: (props: any) => <History {...props} />,
+  Chat: (props: any) => <MessageSquare {...props} />,
+  Settings: (props: any) => <Settings {...props} />,
+  Sliders: (props: any) => <Sliders {...props} />,
+  Admin: (props: any) => <ShieldCheck {...props} />,
+  Moon: (props: any) => <Moon {...props} />,
+  Sun: (props: any) => <Sun {...props} />,
+  Spinner: (props: any) => <Loader2 {...props} />,
+  Trash: (props: any) => <Trash2 {...props} />,
+  Share: (props: any) => <Share2 {...props} />,
+  Download: (props: any) => <Download {...props} />
+};

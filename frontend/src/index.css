@@ -1,0 +1,190 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Fonts */
+    --font-sans: 'Inter', sans-serif;
+    --font-display: 'Poppins', sans-serif;
+
+    /* Semantic Color Tokens - LIGHT THEME */
+    --bg-app: 248 250 252;          /* Slate-50 (#f8fafc) */
+    --bg-surface: 255 255 255;      /* White (#ffffff) */
+    --bg-card: 255 255 255;         /* Card background */
+    --border-token: 226 232 240;    /* Slate-200 (#e2e8f0) */
+    
+    --primary: 67 83 255;           /* Custom primary blue (#4353ff) */
+    --secondary: 100 116 139;       /* Slate-500 (#64748b) */
+    --accent: 79 70 229;            /* Indigo accent (#4f46e5) */
+    
+    --success: 16 185 129;          /* Emerald-500 (#10b981) */
+    --danger: 239 68 68;            /* Red-500 (#ef4444) */
+    --warning: 245 158 11;          /* Amber-500 (#f59e0b) */
+    --info: 59 130 246;             /* Blue-500 (#3b82f6) */
+    
+    --bg-hover: 241 245 249;        /* Slate-100 (#f1f5f9) */
+    --ring-focus: 67 83 255;        /* Focus ring glow */
+    
+    --bg-sidebar: 255 255 255;      /* Sidebar white background */
+    --bg-header: 255 255 255;       /* Header background */
+    --bg-footer: 248 250 252;       /* Footer background */
+    
+    --bg-btn-primary: 67 83 255;    /* Button primary base */
+    --bg-input: 255 255 255;        /* Text field backgrounds */
+    
+    /* Chart Colors (ROUGE Score graphs, time comparisons) */
+    --chart-1: 67 83 255;           /* Primary blue chart line/bar */
+    --chart-2: 16 185 129;          /* Success green chart line/bar */
+    --chart-3: 245 158 11;           /* Warning amber chart line/bar */
+    --chart-4: 239 68 68;           /* Danger red chart line/bar */
+
+    /* Text colors matching theme */
+    --text-main: 15 23 42;          /* Slate-900 (#0f172a) */
+    --text-muted: 100 116 139;      /* Slate-500 (#64748b) */
+
+    /* Layout Tokens */
+    --radius-lg: 12px;
+    --radius-md: 8px;
+    --radius-sm: 6px;
+
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-premium: 0 8px 30px rgba(0, 0, 0, 0.06);
+    --shadow-glow: 0 0 15px rgba(67, 83, 255, 0.15);
+
+    /* Spacing Grid (8px layout offsets) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
+    
+    /* Transitions */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    /* Semantic Color Tokens - DARK THEME */
+    --bg-app: 11 15 25;             /* Dark blue slate (#0b0f19) */
+    --bg-surface: 15 23 42;         /* Slate-900 (#0f172a) */
+    --bg-card: 15 23 42;            /* Card dark surface */
+    --border-token: 30 41 59;       /* Slate-800 (#1e293b) */
+    
+    --primary: 91 107 255;          /* Lighter custom blue (#5b6bff) */
+    --secondary: 148 163 184;      /* Slate-400 (#94a3b8) */
+    --accent: 129 140 248;          /* Indigo accent (#818cf8) */
+    
+    --success: 16 185 129;          /* Emerald-500 (#10b981) */
+    --danger: 248 113 113;          /* Red-400 (#f87171) */
+    --warning: 251 191 36;          /* Amber-400 (#fbbf24) */
+    --info: 96 165 250;             /* Blue-400 (#60a5fa) */
+    
+    --bg-hover: 30 41 59;           /* Slate-800 (#1e293b) */
+    --ring-focus: 91 107 255;       /* Focus ring glow */
+    
+    --bg-sidebar: 15 23 42;         /* Sidebar dark background */
+    --bg-header: 15 23 42;          /* Header background */
+    --bg-footer: 11 15 25;          /* Footer background */
+    
+    --bg-btn-primary: 91 107 255;   /* Button primary base */
+    --bg-input: 11 15 25;           /* Text field background dark */
+    
+    /* Chart Colors - DARK THEME */
+    --chart-1: 91 107 255;
+    --chart-2: 16 185 129;
+    --chart-3: 251 191 36;
+    --chart-4: 248 113 113;
+
+    --text-main: 248 250 252;       /* Slate-50 (#f8fafc) */
+    --text-muted: 148 163 184;      /* Slate-400 (#94a3b8) */
+
+    --shadow-premium: 0 12px 40px rgba(0, 0, 0, 0.3);
+    --shadow-glow: 0 0 20px rgba(91, 107, 255, 0.2);
+  }
+
+  body {
+    background-color: rgb(var(--bg-app));
+    color: rgb(var(--text-main));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    transition: background-color var(--transition-normal), color var(--transition-normal);
+  }
+}
+
+/* Glassmorphism */
+.glass-surface {
+  background: rgba(rgb(var(--bg-surface)), 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(rgb(var(--text-main)), 0.08);
+}
+
+.dark .glass-surface {
+  background: rgba(rgb(var(--bg-surface)), 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Custom premium scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(rgb(var(--text-muted)), 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(rgb(var(--text-muted)), 0.4);
+}
+
+/* Shimmer Loading Keyframes */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(rgb(var(--text-main)), 0.06) 25%,
+    rgba(rgb(var(--text-main)), 0.12) 37%,
+    rgba(rgb(var(--text-main)), 0.06) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+/* Toast Spring animation variants */
+.toast-enter {
+  animation: toast-spring 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes toast-spring {
+  0% {
+    transform: translateY(100%) scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}

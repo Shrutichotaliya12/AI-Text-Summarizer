@@ -1,0 +1,45 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Text Summarization using Transformers — requirements.txt
+# Python 3.11+  |  Compatible versions tested on 2024-Q1
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ── Web UI ─────────────────────────────────────────────────────────────────────
+streamlit>=1.32.0,<2.0.0
+
+# ── HuggingFace Stack ──────────────────────────────────────────────────────────
+transformers>=4.38.2,<5.0.0
+datasets>=2.18.0,<3.0.0
+huggingface-hub>=0.21.4,<2.0.0
+tokenizers>=0.15.2,<1.0.0
+safetensors>=0.4.2,<1.0.0
+
+# ── PyTorch (CPU build — swap for CUDA wheel if GPU available) ─────────────────
+# For GPU: pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch>=2.2.0
+sentencepiece>=0.2.0,<1.0.0
+
+# ── ROUGE Evaluation ───────────────────────────────────────────────────────────
+rouge-score>=0.1.2,<1.0.0
+
+# ── Data / Analytics ───────────────────────────────────────────────────────────
+pandas>=2.2.1
+numpy>=1.26.4
+
+# ── System Monitoring ──────────────────────────────────────────────────────────
+psutil>=5.9.8,<6.0.0
+
+# ── PDF Support (optional but included) ────────────────────────────────────────
+PyMuPDF>=1.23.26,<2.0.0
+
+# ── Logging / Colour ───────────────────────────────────────────────────────────
+colorlog>=6.8.2,<7.0.0
+
+# ── Testing ────────────────────────────────────────────────────────────────────
+pytest>=8.1.1,<9.0.0
+pytest-cov>=5.0.0,<6.0.0
+
+# ── Development / Code Quality (optional) ──────────────────────────────────────
+# black>=24.3.0
+# isort>=5.13.2
+# mypy>=1.9.0
+python-docx

@@ -1,0 +1,51 @@
+# Python caching
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+ENV/
+env/
+
+# Node caching & build
+node_modules/
+dist/
+dist-ssr/
+*.local
+.eslintcache
+
+# Databases & local data
+*.db
+*.sqlite3
+pg_data/
+redis_data/
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Environment files
+.env
+.env*.local
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Docker volumes
+uploads/
+
+# Logs
+*.log
+logs/
+
+# Python egg
+*.egg-info/
