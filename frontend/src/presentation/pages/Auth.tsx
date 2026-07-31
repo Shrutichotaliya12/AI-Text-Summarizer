@@ -461,7 +461,7 @@ export const Auth: React.FC = () => {
   const { t, locale, setLocale } = useTranslation();
   const { success, error: toastError } = useToast();
 
-  const [currentScreen, setCurrentScreen] = useState<ScreenState>("landing");
+  const [currentScreen, setCurrentScreen] = useState<ScreenState>("login");
 
   // Form states
   const [fullName, setFullName] = useState("");
@@ -536,6 +536,8 @@ export const Auth: React.FC = () => {
 
   // ────── Google Sign-In ──────
   useEffect(() => {
+    let interval: NodeJS.Timeout;
+
     const initGoogle = async () => {
       try {
         const envClientId = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID;
@@ -545,51 +547,72 @@ export const Auth: React.FC = () => {
           clientId = configRes.data.google_client_id;
         }
 
-        if (clientId && (window as any).google) {
-          setHasGoogleClientId(true);
-          if (!googleInitializedRef.current) {
-            googleInitializedRef.current = true;
-            (window as any).google.accounts.id.initialize({
-              client_id: clientId,
-              prompt: "select_account",
-              callback: async (response: any) => {
-                setIsLoading(true);
-                try {
-                  const authRes = await apiClient.post("/auth/google", { token: response.credential });
-                  const { access_token, email: userEmail } = authRes.data;
-                  success("Welcome Back");
-                  setTimeout(() => {
-                    login({ email: userEmail }, access_token);
-                  }, 1000);
-                } catch (e: any) {
-                  toastError("Failed to authenticate Google token.");
-                } finally {
-                  setIsLoading(false);
-                }
-              },
-            });
-          }
+        if (!clientId) return;
 
-          setTimeout(() => {
+        setHasGoogleClientId(true);
+
+        const renderGoogleButton = () => {
+          if ((window as any).google) {
+            if (!googleInitializedRef.current) {
+              googleInitializedRef.current = true;
+              (window as any).google.accounts.id.initialize({
+                client_id: clientId,
+                prompt: "select_account",
+                callback: async (response: any) => {
+                  setIsLoading(true);
+                  try {
+                    const authRes = await apiClient.post("/auth/google", { token: response.credential });
+                    const { access_token, email: userEmail } = authRes.data;
+                    success("Welcome Back");
+                    setTimeout(() => {
+                      login({ email: userEmail }, access_token);
+                    }, 1000);
+                  } catch (e: any) {
+                    toastError("Failed to authenticate Google token.");
+                  } finally {
+                    setIsLoading(false);
+                  }
+                },
+              });
+            }
+
             const btnDiv = document.getElementById("google-signin-btn");
-            if (btnDiv && (window as any).google) {
+            if (btnDiv) {
               (window as any).google.accounts.id.renderButton(btnDiv, {
                 theme: "outline",
                 size: "large",
-                width: 380,
+                width: 320,
                 text: "continue_with",
               });
+              return true; // render success
             }
-          }, 300);
+          }
+          return false; // not ready yet
+        };
+
+        // Try to render immediately, if it fails then poll
+        if (!renderGoogleButton()) {
+          interval = setInterval(() => {
+            if (renderGoogleButton()) {
+              clearInterval(interval);
+            }
+          }, 100);
+          
+          // Stop polling after 5 seconds to avoid memory leaks
+          setTimeout(() => clearInterval(interval), 5000);
         }
       } catch (err) {
         console.error("Failed to initialize Google button:", err);
       }
     };
 
-    if (currentScreen === "landing") {
+    if (currentScreen === "login" || currentScreen === "signup") {
       initGoogle();
     }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [currentScreen]);
 
   /* ────── Handlers ────── */
@@ -898,87 +921,6 @@ export const Auth: React.FC = () => {
             {/* ═══════════════════════════════════
                 SCREEN: LANDING (Welcome)
                ═══════════════════════════════════ */}
-            {currentScreen === "landing" && (
-              <>
-                {/* Header */}
-                <div className="flex flex-col items-center text-center gap-3">
-                  <AiLogo size="lg" />
-                  <div className="flex flex-col gap-1 mt-1">
-                    <h1 className="text-xl md:text-2xl font-bold tracking-tight font-display" style={{ color: "rgb(var(--text-main))" }}>
-                      AI Text Summarizer Pro
-                    </h1>
-                    <p className="text-[12px] leading-relaxed max-w-[300px]" style={{ color: "rgb(var(--text-muted))" }}>
-                      Summarize Documents Intelligently using Artificial Intelligence.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-col gap-3">
-                  {/* Google button */}
-                  {hasGoogleClientId ? (
-                    <div id="google-signin-btn" className="w-full flex justify-center" />
-                  ) : (
-                    <AuthButton
-                      variant="outline"
-                      icon={<Chrome className="w-4 h-4" style={{ color: "rgb(239, 68, 68)" }} />}
-                      onClick={() => handleLogin({ preventDefault: () => {} } as any)}
-                    >
-                      Continue with Google
-                    </AuthButton>
-                  )}
-
-                  {/* Email button */}
-                  <AuthButton
-                    variant="outline"
-                    icon={<Mail className="w-4 h-4" style={{ color: "rgb(var(--primary))" }} />}
-                    onClick={() => setCurrentScreen("login")}
-                  >
-                    Continue with Email
-                  </AuthButton>
-
-                  <Divider text="or" />
-
-                  {/* Create Account + Sign In */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <AuthButton
-                      variant="primary"
-                      icon={<UserPlus className="w-4 h-4" />}
-                      onClick={() => setCurrentScreen("signup")}
-                    >
-                      Create Account
-                    </AuthButton>
-                    <AuthButton
-                      variant="ghost"
-                      icon={<LogIn className="w-4 h-4" />}
-                      onClick={() => setCurrentScreen("login")}
-                      className="hover:!bg-[rgba(var(--bg-hover),1)]"
-                    >
-                      Sign In
-                    </AuthButton>
-                  </div>
-                </div>
-
-                {/* Legal footer */}
-                <div className="text-center space-y-3 pt-2">
-                  <p className="text-[10px] leading-relaxed" style={{ color: "rgb(var(--text-muted))" }}>
-                    By continuing, you agree to our{" "}
-                    <button className="underline underline-offset-2 hover:opacity-80 transition-opacity font-semibold" style={{ color: "rgb(var(--primary))" }}>
-                      Privacy Policy
-                    </button>{" "}
-                    and{" "}
-                    <button className="underline underline-offset-2 hover:opacity-80 transition-opacity font-semibold" style={{ color: "rgb(var(--primary))" }}>
-                      Terms of Service
-                    </button>
-                    .
-                  </p>
-                  <p className="text-[9px] font-medium" style={{ color: "rgb(var(--text-muted))", opacity: 0.5 }}>
-                    Version 1.0.0
-                  </p>
-                </div>
-              </>
-            )}
-
             {/* ═══════════════════════════════════
                 SCREEN: LOGIN
                ═══════════════════════════════════ */}
@@ -995,6 +937,21 @@ export const Auth: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-4">
+                  {/* Google sign-in button */}
+                  {hasGoogleClientId ? (
+                    <div id="google-signin-btn" className="w-full flex justify-center mt-1" />
+                  ) : (
+                    <AuthButton
+                      variant="outline"
+                      icon={<Chrome className="w-4 h-4" style={{ color: "rgb(239, 68, 68)" }} />}
+                      onClick={() => handleLogin({ preventDefault: () => {} } as any)}
+                    >
+                      Continue with Google
+                    </AuthButton>
+                  )}
+
+                  <Divider text="or" />
+
                   <AuthInput
                     id="login-email"
                     label={t("auth_label_email")}
@@ -1044,7 +1001,6 @@ export const Auth: React.FC = () => {
                         </button>
                       }
                     />
-                    {/* Remove duplicate label since AuthInput already renders one — override the wrapper label */}
                   </div>
 
                   {/* Remember me */}
@@ -1077,30 +1033,26 @@ export const Auth: React.FC = () => {
                 </AuthButton>
 
                 {/* Footer nav */}
-                <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid rgb(var(--border-token))" }}>
+                <div className="text-center pt-3" style={{ borderTop: "1px solid rgb(var(--border-token))" }}>
+                  <span className="text-[12px]" style={{ color: "rgb(var(--text-muted))" }}>
+                    Don't have an account?{" "}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setCurrentScreen("landing")}
-                    className="flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:opacity-70"
-                    style={{ color: "rgb(var(--text-muted))" }}
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" /> Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentScreen("signup")}
+                    onClick={() => {
+                      setEmail("");
+                      setPassword("");
+                      setCurrentScreen("signup");
+                    }}
                     className="text-[12px] font-semibold hover:underline underline-offset-2"
                     style={{ color: "rgb(var(--primary))" }}
                   >
-                    Create account
+                    Create one
                   </button>
                 </div>
               </form>
             )}
 
-            {/* ═══════════════════════════════════
-                SCREEN: SIGNUP
-               ═══════════════════════════════════ */}
             {currentScreen === "signup" && (
               <form onSubmit={handleSignup} className="flex flex-col gap-5">
                 <div className="flex flex-col items-center text-center gap-2">
@@ -1114,6 +1066,21 @@ export const Auth: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-3.5">
+                  {/* Google sign-in button */}
+                  {hasGoogleClientId ? (
+                    <div id="google-signin-btn" className="w-full flex justify-center mt-1" />
+                  ) : (
+                    <AuthButton
+                      variant="outline"
+                      icon={<Chrome className="w-4 h-4" style={{ color: "rgb(239, 68, 68)" }} />}
+                      onClick={() => handleLogin({ preventDefault: () => {} } as any)}
+                    >
+                      Continue with Google
+                    </AuthButton>
+                  )}
+
+                  <Divider text="or" />
+
                   <AuthInput
                     id="signup-name"
                     label="Full Name"
@@ -1230,22 +1197,22 @@ export const Auth: React.FC = () => {
                   {t("auth_btn_create")}
                 </AuthButton>
 
-                <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid rgb(var(--border-token))" }}>
+                {/* Footer nav */}
+                <div className="text-center pt-3" style={{ borderTop: "1px solid rgb(var(--border-token))" }}>
+                  <span className="text-[12px]" style={{ color: "rgb(var(--text-muted))" }}>
+                    Already have an account?{" "}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setCurrentScreen("landing")}
-                    className="flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:opacity-70"
-                    style={{ color: "rgb(var(--text-muted))" }}
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5" /> Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentScreen("login")}
+                    onClick={() => {
+                      setEmail("");
+                      setPassword("");
+                      setCurrentScreen("login");
+                    }}
                     className="text-[12px] font-semibold hover:underline underline-offset-2"
                     style={{ color: "rgb(var(--primary))" }}
                   >
-                    Already have an account? Login
+                    Sign in
                   </button>
                 </div>
               </form>

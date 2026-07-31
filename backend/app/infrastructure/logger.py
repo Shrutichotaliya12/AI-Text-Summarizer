@@ -19,9 +19,21 @@ class JSONFormatter(logging.Formatter):
 def get_logger(name: str):
     logger = logging.getLogger(name)
     if not logger.handlers:
+        import os
+        # Console Handler
         handler = logging.StreamHandler()
         handler.setFormatter(JSONFormatter())
         logger.addHandler(handler)
+        
+        # File Handler
+        try:
+            os.makedirs("logs", exist_ok=True)
+            file_handler = logging.FileHandler("logs/app.log", encoding="utf-8")
+            file_handler.setFormatter(JSONFormatter())
+            logger.addHandler(file_handler)
+        except Exception as e:
+            print(f"Failed to initialize file logger: {e}")
+            
         logger.setLevel(logging.INFO)
     return logger
 

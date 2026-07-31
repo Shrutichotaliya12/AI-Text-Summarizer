@@ -9,10 +9,7 @@ if settings.ENVIRONMENT == "testing":
     if not db_url:
         db_url = "sqlite:///./test.db"
 elif settings.ENVIRONMENT == "development" or not db_url or "postgresql" not in db_url:
-    if settings.ENVIRONMENT == "development":
-        db_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    else:
-        db_dir = "/tmp"
+    db_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     db_path = os.path.join(db_dir, "saas_summarizer.db")
     db_url = f"sqlite:///{db_path}"
 

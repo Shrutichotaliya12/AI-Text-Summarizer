@@ -241,10 +241,10 @@ def send_real_email(to_email: str, subject: str, html_body: str, text_body: str 
     import time
     from app.infrastructure.logger import logger
     
-    # STRICT WHITELIST
     allowed_subjects = [
         "verify your ai text summarizer account",
-        "welcome to ai text summarizer pro!"
+        "welcome to ai text summarizer pro!",
+        "ai text summarizer pro - verification code"
     ]
     
     subject_lower = subject.lower()
@@ -268,8 +268,8 @@ def send_real_email(to_email: str, subject: str, html_body: str, text_body: str 
         print("[OTP SMTP INFO] SMTP credentials not set. Simulated success.")
         return
         
-    if settings.SMTP_USER != "textsummarizer.ai@gmail.com":
-        error_msg = f"[SMTP SECURITY] Refusing to send from unauthorized email: {settings.SMTP_USER}"
+    if settings.ENVIRONMENT == "production" and settings.SMTP_USER != "textsummarizer.ai@gmail.com":
+        error_msg = f"[SMTP SECURITY] Refusing to send from unauthorized email in production: {settings.SMTP_USER}"
         print(error_msg)
         logger.error(error_msg)
         return
@@ -740,15 +740,30 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 def verify_google_id_token(token: str):
     import urllib.request
     import json
+    import ssl
+    import urllib.error
+    import os
     try:
         url = f"https://oauth2.googleapis.com/tokeninfo?id_token={token}"
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=5) as response:
+        context = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, context=context, timeout=5) as response:
             data = json.loads(response.read().decode())
             if "email" in data:
                 return data["email"], data.get("name", "Google User"), data.get("picture", "")
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        error_msg = f"Google Token Verification HTTPError {e.code}: {error_body}"
+        print(error_msg)
+        os.makedirs("logs", exist_ok=True)
+        with open("logs/google_auth_error.log", "a") as f:
+            f.write(f"[{datetime.now().isoformat()}] {error_msg}\n")
     except Exception as e:
-        print(f"Google Token Verification Error: {e}")
+        error_msg = f"Google Token Verification Exception: {e}"
+        print(error_msg)
+        os.makedirs("logs", exist_ok=True)
+        with open("logs/google_auth_error.log", "a") as f:
+            f.write(f"[{datetime.now().isoformat()}] {error_msg}\n")
     return None
 
 @router.post("/google")
@@ -762,6 +777,11 @@ def google_oauth(payload: OAuthPayload, db: Session = Depends(get_db)):
         result = verify_google_id_token(payload.token)
         if result:
             email, name, picture = result
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Google token verification failed. Please ensure your Google account is authorized."
+            )
 
     db_user = db.query(User).filter(User.email == email).first()
     if not db_user:

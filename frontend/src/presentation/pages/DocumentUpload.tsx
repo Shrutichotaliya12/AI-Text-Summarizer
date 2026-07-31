@@ -624,7 +624,7 @@ export const DocumentUpload: React.FC = () => {
             </div>
             <div>
               <h4 className="font-bold text-xs text-main">Drag & Drop Files Here</h4>
-              <p className="text-[10px] text-muted mt-0.5">Supports PDF, DOCX, DOC, TXT, CSV, XLS, XLSX, MD, HTML, JSON, PNG, JPEG, WEBP (Max 10MB per file)</p>
+              <p className="text-[10px] text-muted mt-0.5">Supports PDF, DOCX, DOC, TXT, CSV, XLS, XLSX, MD, HTML, JSON, PNG, JPEG, WEBP (Max 50MB per file)</p>
             </div>
             <input
               ref={fileInputRef}

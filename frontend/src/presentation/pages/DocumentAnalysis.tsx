@@ -4,25 +4,16 @@ import { ApexOptions } from "apexcharts";
 import { 
   BarChart3, 
   Map, 
-  Grid, 
-  PieChart, 
-  Compass, 
-  CalendarDays, 
-  Award,
   Sparkles,
-  GitMerge,
   FileText,
   Activity,
-  List,
   RefreshCw,
   Search,
-  Download,
   ShieldAlert,
-  BrainCircuit,
-  Scale,
   TrendingUp,
   SmilePlus,
-  FileDown
+  Compass,
+  List
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -30,6 +21,35 @@ import { Button } from "@/components/ui/Button";
 import { useModelStore } from "@/state";
 import { useToast } from "@/context/ToastContext";
 import { apiClient } from "@/api";
+
+// Helper function to extract 3 dynamic key takeaways from text based on semantic cues
+const extractTakeaways = (text: string): string[] => {
+  if (!text) return [];
+  // Split into sentences
+  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 25 && s.length < 160);
+  
+  const keywords = ["should", "must", "important", "key", "recommend", "need to", "significant", "conclude", "primary", "focus", "essential", "aim", "development"];
+  const matches: string[] = [];
+  
+  for (const sentence of sentences) {
+    if (keywords.some(kw => sentence.toLowerCase().includes(kw))) {
+      // Avoid duplicate or very similar sentences
+      if (!matches.some(m => m.toLowerCase().slice(0, 15) === sentence.toLowerCase().slice(0, 15))) {
+        matches.push(sentence);
+      }
+    }
+    if (matches.length >= 3) break;
+  }
+  
+  // Fallback to first 3 sentences if not enough matches
+  if (matches.length < 3) {
+    const remaining = 3 - matches.length;
+    const fallbacks = sentences.filter(s => !matches.includes(s)).slice(0, remaining);
+    matches.push(...fallbacks);
+  }
+  
+  return matches.map(s => s.endsWith(".") ? s : s + ".");
+};
 
 interface KeywordItem {
   keyword: string;
@@ -145,6 +165,19 @@ export const DocumentAnalysis: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [takeaways, setTakeaways] = useState<string[]>([]);
+
+  const fetchDocuments = async () => {
+    try {
+      const res = await apiClient.get('/upload/?page_size=100&sort_by=upload_time&sort_order=desc');
+      if (res.data.documents) {
+        setDocuments(res.data.documents);
+      }
+    } catch (e) {
+      console.error("Failed to fetch documents list", e);
+    }
+  };
 
   const fetchAnalysis = async (forceRefresh = false) => {
     if (!currentDocument) return;
@@ -160,6 +193,15 @@ export const DocumentAnalysis: React.FC = () => {
       }
       const response = await apiClient.get(`/analysis/${currentDocument.id}`);
       setAnalysis(response.data);
+      
+      // Fetch full document details to get text for takeaways extraction
+      const docDetails = await apiClient.get(`/upload/document/${currentDocument.id}`);
+      if (docDetails.data && docDetails.data.text) {
+        setTakeaways(extractTakeaways(docDetails.data.text));
+      } else {
+        setTakeaways([]);
+      }
+
       if (forceRefresh) {
         success("NLP Analysis successfully refreshed!");
       }
@@ -171,6 +213,11 @@ export const DocumentAnalysis: React.FC = () => {
       setRefreshing(false);
     }
   };
+
+  // Load document list once on mount
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
 
   // Sync analysis whenever document changes, or fetch latest document if none selected
   useEffect(() => {
@@ -360,9 +407,29 @@ export const DocumentAnalysis: React.FC = () => {
       {/* Page Title & Search exports bar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h2 className="text-xl font-bold font-display text-main">Document Intelligence Analysis</h2>
             {refreshing && <RefreshCw className="w-4 h-4 text-primary animate-spin" />}
+            
+            {/* Dropdown document selector */}
+            {documents.length > 0 && (
+              <select
+                value={currentDocument?.id || ""}
+                onChange={(e) => {
+                  const selected = documents.find(d => d.id === e.target.value);
+                  if (selected) {
+                    setCurrentDocument(selected);
+                  }
+                }}
+                className="bg-slate-100 dark:bg-slate-800/40 border border-borderToken rounded-lg px-3 py-1 text-xs text-main font-semibold outline-none focus:ring-1 focus:ring-primary cursor-pointer max-w-[200px] truncate"
+              >
+                {documents.map((doc) => (
+                  <option key={doc.id} value={doc.id} className="bg-surface text-main">
+                    {doc.display_name || doc.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <p className="text-xs text-muted">
             Advanced NLP linguistics, named entity recognition index, and tokenization distributions metrics.
@@ -407,14 +474,15 @@ export const DocumentAnalysis: React.FC = () => {
         </div>
       </div>
 
-      {/* Row 1: Document Overview Grid */}
+      {/* Overview & Core Diagnostics Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
+        {/* Document Overview & Readability Audience */}
         <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken lg:col-span-1">
-          <div className="flex justify-between items-center border-b border-borderTokenpb-2 pb-2">
+          <div className="flex justify-between items-center border-b border-borderToken pb-2">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-primary" />
-              <h3 className="font-bold text-xs font-display text-main">Overview Catalog</h3>
+              <h3 className="font-bold text-xs font-display text-main">Document Details</h3>
             </div>
             <Badge variant="primary" className="text-[8px]">ACTIVE</Badge>
           </div>
@@ -423,10 +491,7 @@ export const DocumentAnalysis: React.FC = () => {
               { label: "Document Name", value: analysis.document_name },
               { label: "File Type", value: analysis.file_type.toUpperCase() },
               { label: "Upload Date", value: new Date(analysis.upload_date).toLocaleDateString() },
-              { label: "Last Modified", value: new Date(analysis.last_modified).toLocaleDateString() },
               { label: "File Size", value: analysis.file_size },
-              { label: "Total Pages", value: analysis.page_count },
-              { label: "Estimated Read Time", value: `${Math.max(1, Math.round(analysis.text_statistics.totalWords / 200))} min` },
               { label: "Detected Language", value: analysis.language_analysis.language }
             ].map((item, idx) => (
               <div key={idx} className="flex justify-between border-b border-borderToken/35 pb-1.5">
@@ -437,242 +502,105 @@ export const DocumentAnalysis: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Readability & Target Audience Meter */}
+          <div className="border-t border-borderToken/40 pt-3 mt-1">
+            <span className="text-[9px] text-muted font-bold uppercase block mb-1.5">Readability & Difficulty Level</span>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <div className="flex justify-between text-[10px] font-bold text-main mb-1">
+                  <span>{analysis.readability_scores.readingDifficulty}</span>
+                  <span>{analysis.readability_scores.fleschReadingEase} / 100</span>
+                </div>
+                <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    className="bg-primary h-full transition-all" 
+                    style={{ width: `${analysis.readability_scores.fleschReadingEase}%` }} 
+                  />
+                </div>
+              </div>
+            </div>
+            <p className="text-[9px] text-muted mt-2 leading-relaxed">
+              Target Audience: <strong>{analysis.readability_scores.estimatedEducationLevel}</strong> (based on sentence structure analysis).
+            </p>
+          </div>
         </Card>
 
-        {/* Text Statistics block */}
+        {/* Text Stats & Summary Diagnostics */}
         <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken lg:col-span-2">
           <div className="flex justify-between items-center border-b border-borderToken pb-2">
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-emerald-500" />
-              <h3 className="font-bold text-xs font-display text-main">Calculated Text Statistics</h3>
+              <h3 className="font-bold text-xs font-display text-main">Key Statistics & Summarization Diagnostics</h3>
             </div>
-            <span className="text-[9px] text-muted uppercase font-bold">Linguistic Index</span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3.5 text-xs leading-relaxed max-h-[300px] overflow-y-auto pr-1">
-            {[
-              { label: "Total Characters", value: analysis.text_statistics.totalCharacters },
-              { label: "Chars (No Spaces)", value: analysis.text_statistics.charactersWithoutSpaces },
-              { label: "Total Words", value: analysis.text_statistics.totalWords },
-              { label: "Unique Words", value: analysis.text_statistics.uniqueWords },
-              { label: "Vocabulary Richness", value: analysis.text_statistics.vocabularyRichness },
-              { label: "Avg Word Length", value: `${analysis.text_statistics.averageWordLength} chars` },
-              { label: "Sentence Count", value: analysis.text_statistics.sentenceCount },
-              { label: "Avg Sentence Length", value: `${analysis.text_statistics.averageSentenceLength} words` },
-              { label: "Paragraph Count", value: analysis.text_statistics.paragraphCount },
-              { label: "Avg Paragraph Length", value: `${analysis.text_statistics.averageParagraphLength} words` },
-              { label: "Special Characters", value: analysis.text_statistics.specialCharacterCount },
-              { label: "Numbers Count", value: analysis.text_statistics.numberCount }
-            ].map((item, idx) => (
-              <div key={idx} className="flex justify-between border-b border-borderToken/30 pb-1">
-                <span className="text-muted font-medium">{item.label}</span>
-                <span className="text-main font-bold">{renderHighlighted(item.value)}</span>
-              </div>
-            ))}
+            <span className="text-[9px] text-muted uppercase font-bold">Performance Metrics</span>
           </div>
 
-          <div className="flex flex-wrap gap-4 border-t border-borderToken/40 pt-3.5 text-[9px] text-muted">
-            <div className="flex-1 min-w-[120px]">
-              <strong>Longest Word:</strong>
-              <p className="text-main font-semibold mt-0.5 truncate max-w-[200px]" title={analysis.text_statistics.longestWord}>
-                {renderHighlighted(analysis.text_statistics.longestWord)}
-              </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+            <div className="border-r border-borderToken/30 pr-2">
+              <span className="text-muted block">Total Words</span>
+              <strong className="block text-main font-bold text-lg mt-0.5">{renderHighlighted(analysis.text_statistics.totalWords)}</strong>
             </div>
-            <div className="flex-1 min-w-[120px]">
-              <strong>Shortest Word:</strong>
-              <p className="text-main font-semibold mt-0.5 truncate" title={analysis.text_statistics.shortestWord}>
-                {renderHighlighted(analysis.text_statistics.shortestWord)}
-              </p>
+            <div className="border-r border-borderToken/30 pr-2">
+              <span className="text-muted block">Total Sentences</span>
+              <strong className="block text-main font-bold text-lg mt-0.5">{renderHighlighted(analysis.text_statistics.sentenceCount)}</strong>
             </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Row 2: Readability Scores & Named Entity Recognition */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <Scale className="w-4 h-4 text-indigo-500" />
-              <h3 className="font-bold text-xs font-display text-main">Readability & Difficulty Indices</h3>
-            </div>
-            <span className="text-[8px] bg-indigo-500/10 text-indigo-500 font-bold px-1.5 py-0.5 rounded">FORMULAS</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-xs">
-            {[
-              { label: "Flesch Reading Ease", value: analysis.readability_scores.fleschReadingEase, desc: "Higher is easier (0-100)" },
-              { label: "Flesch-Kincaid Grade", value: analysis.readability_scores.fleschKincaidGrade, desc: "Approximate school grade" },
-              { label: "Gunning Fog Index", value: analysis.readability_scores.gunningFogIndex, desc: "Syllables/sentence complexity" },
-              { label: "SMOG Readability", value: analysis.readability_scores.smogIndex, desc: "Polysyllabic word index" },
-              { label: "Coleman-Liau Index", value: analysis.readability_scores.colemanLiauIndex, desc: "Characters counts formula" },
-              { label: "Automated Readability (ARI)", value: analysis.readability_scores.automatedReadabilityIndex, desc: "Word size grade formula" }
-            ].map((item, idx) => (
-              <div key={idx} className="flex flex-col border-b border-borderToken/35 pb-1">
-                <div className="flex justify-between">
-                  <span className="text-muted font-medium">{item.label}</span>
-                  <strong className="text-main">{renderHighlighted(item.value)}</strong>
-                </div>
-                <span className="text-[8px] text-muted mt-0.5">{item.desc}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 bg-slate-50/50 dark:bg-slate-800/10 border border-borderToken/40 p-3 rounded-lg text-xs mt-2.5">
-            <div>
-              <span className="text-[9px] text-muted">Reading Difficulty</span>
-              <strong className="block text-primary font-bold text-sm mt-0.5">{renderHighlighted(analysis.readability_scores.readingDifficulty)}</strong>
+            <div className="border-r border-borderToken/30 pr-2">
+              <span className="text-muted block">Read Time (Est)</span>
+              <strong className="block text-primary font-bold text-lg mt-0.5">{Math.max(1, Math.round(analysis.text_statistics.totalWords / 200))} min</strong>
             </div>
             <div>
-              <span className="text-[9px] text-muted">Estimated Education Level</span>
-              <strong className="block text-emerald-500 font-bold text-sm mt-0.5">{renderHighlighted(analysis.readability_scores.estimatedEducationLevel)}</strong>
+              <span className="text-muted block">Speech Time (Est)</span>
+              <strong className="block text-emerald-500 font-bold text-lg mt-0.5">{Math.max(1, Math.round(analysis.text_statistics.totalWords / 130))} min</strong>
             </div>
           </div>
-        </Card>
 
-        {/* Named Entity Recognition (NER) results block */}
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <BrainCircuit className="w-4 h-4 text-amber-500" />
-              <h3 className="font-bold text-xs font-display text-main">Named Entity Recognition (NER) Index</h3>
-            </div>
-            <span className="text-[9px] text-muted font-bold">Classified Categories</span>
-          </div>
-
-          <div className="flex flex-col gap-3 max-h-[340px] overflow-y-auto pr-1">
-            {Object.entries(analysis.ner_results).map(([cat, list]) => (
-              <div key={cat} className="flex flex-col gap-1 pb-2 border-b border-borderToken/30">
-                <span className="text-[10px] font-bold text-muted uppercase">{cat} ({list.length})</span>
-                <div className="flex flex-wrap gap-1">
-                  {list.length === 0 ? (
-                    <span className="text-[9px] text-muted italic">None detected</span>
-                  ) : (
-                    list.map((ent, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-[9px] py-0 border-transparent max-w-[150px] truncate select-all">
-                        {renderHighlighted(ent)}
-                      </Badge>
-                    ))
-                  )}
-                </div>
+          {analysis.summarization_analysis ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50/50 dark:bg-slate-900/10 border border-borderToken/40 p-4 rounded-xl text-xs mt-2.5">
+              <div>
+                <span className="text-muted">Original vs Summary Words</span>
+                <strong className="block text-main font-bold text-sm mt-0.5">
+                  {analysis.text_statistics.totalWords.toLocaleString()} / {Math.round(analysis.summarization_analysis.summaryLength / 6)}
+                </strong>
               </div>
-            ))}
-          </div>
+              <div>
+                <span className="text-muted">Compression Ratio</span>
+                <strong className="block text-primary font-bold text-sm mt-0.5">
+                  {analysis.summarization_analysis.compressionRatio}%
+                </strong>
+              </div>
+              <div>
+                <span className="text-muted">Reading Time Saved</span>
+                <strong className="block text-emerald-500 font-bold text-sm mt-0.5">
+                  {analysis.summarization_analysis.readingTimeSaved} min
+                </strong>
+              </div>
+              <div>
+                <span className="text-muted">Info Retention</span>
+                <strong className="block text-amber-500 font-bold text-sm mt-0.5">
+                  {analysis.summarization_analysis.informationRetention}%
+                </strong>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center p-6 bg-slate-50/50 dark:bg-slate-900/10 border border-dashed border-borderToken rounded-xl text-xs text-muted mt-2.5">
+              Generate a summary in the <strong>Summarizer</strong> page to unlock comparison diagnostics.
+            </div>
+          )}
         </Card>
       </div>
 
-      {/* Row 3: Keyword Bars Chart & POS Distribution & Word Cloud */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken lg:col-span-1">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-cyan-500" />
-              <h3 className="font-bold text-xs font-display text-main">Part of Speech (POS)</h3>
-            </div>
-            <span className="text-[9px] text-muted font-bold">Ratios (%)</span>
-          </div>
-          <div className="flex-1 flex items-center justify-center min-h-[220px]">
-            <ReactApexChart
-              options={posChartOptions}
-              series={posChartSeries}
-              type="donut"
-              width="100%"
-            />
-          </div>
-        </Card>
-
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken lg:col-span-1">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-pink-500" />
-              <h3 className="font-bold text-xs font-display text-main">Keywords Importance</h3>
-            </div>
-            <span className="text-[9px] text-muted font-bold">Occurrences Count</span>
-          </div>
-          <div className="h-[240px]">
-            <ReactApexChart
-              options={keywordChartOptions}
-              series={keywordChartSeries}
-              type="bar"
-              height="100%"
-            />
-          </div>
-        </Card>
-
-        {/* Word Cloud */}
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken lg:col-span-1">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <h3 className="font-bold text-xs font-display text-main">Semantic Word Cloud</h3>
-            </div>
-            <span className="text-[9px] text-muted font-bold">Terms Weight</span>
-          </div>
-          <div className="flex-1 flex flex-wrap gap-x-3.5 gap-y-2.5 items-center justify-center p-3.5 bg-slate-50/50 dark:bg-slate-900/10 rounded-xl border border-borderToken select-none min-h-[220px]">
-            {wordCloudTags.map((tag, idx) => (
-              <span 
-                key={idx} 
-                className={`${tag.weight} cursor-pointer hover:scale-110 hover:text-primary transition-all duration-200`}
-              >
-                {renderHighlighted(tag.text)}
-              </span>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      {/* Row 4: Sentiment Profile & Topics Distribution */}
+      {/* Row 2: Topics Modelling & Sentiment Emotions Profile */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <SmilePlus className="w-4 h-4 text-emerald-500" />
-              <h3 className="font-bold text-xs font-display text-main">Sentiment & Emotions Profile</h3>
-            </div>
-            <span className="text-[9px] text-muted font-bold">Tone Percentages</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-            <div className="flex items-center justify-center">
-              <ReactApexChart
-                options={sentimentChartOptions}
-                series={sentimentChartSeries}
-                type="pie"
-                width="100%"
-              />
-            </div>
-
-            {/* Emotions breakdown */}
-            <div className="flex flex-col gap-2.5 text-xs">
-              <span className="text-[9px] font-bold text-muted uppercase">Emotion Spectrum Distribution</span>
-              {Object.entries(analysis.sentiment_emotion.emotions).map(([emotion, val]) => (
-                <div key={emotion} className="flex flex-col gap-1">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-muted capitalize">{emotion}</span>
-                    <strong className="text-main">{renderHighlighted(val)}%</strong>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                    <div 
-                      className="bg-primary h-full transition-all" 
-                      style={{ width: `${val}%` }} 
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        {/* Topics modeling */}
+        {/* Topics modelling */}
         <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
           <div className="flex justify-between items-center border-b border-borderToken pb-2">
             <div className="flex items-center gap-2">
               <Map className="w-4 h-4 text-primary" />
               <h3 className="font-bold text-xs font-display text-main">Topics Modelling Distribution</h3>
             </div>
-            <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">{analysis.topics.mainTopic}</span>
+            <Badge variant="primary" className="text-[9px] font-bold">{analysis.topics.mainTopic}</Badge>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
@@ -705,47 +633,155 @@ export const DocumentAnalysis: React.FC = () => {
             </div>
           </div>
         </Card>
-      </div>
 
-      {/* Row 5: Summarization comparison diagnostics (if available) */}
-      {analysis.summarization_analysis && (
+        {/* Sentiment & Emotions Profile */}
         <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
           <div className="flex justify-between items-center border-b border-borderToken pb-2">
             <div className="flex items-center gap-2">
-              <GitMerge className="w-4 h-4 text-emerald-500" />
-              <h3 className="font-bold text-xs font-display text-main">Summarization Metrics & Saved Diagnostics</h3>
+              <SmilePlus className="w-4 h-4 text-emerald-500" />
+              <h3 className="font-bold text-xs font-display text-main">Sentiment & Emotions Profile</h3>
             </div>
-            <span className="text-[9px] text-muted font-bold">RAG COMPARISON</span>
+            <span className="text-[9px] text-muted font-bold">Tone Percentages</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-            <div>
-              <span className="text-muted">Original vs Summary Char length</span>
-              <strong className="block text-main font-bold text-sm mt-0.5">
-                {analysis.summarization_analysis.originalLength.toLocaleString()} / {analysis.summarization_analysis.summaryLength.toLocaleString()}
-              </strong>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+            <div className="flex items-center justify-center">
+              <ReactApexChart
+                options={sentimentChartOptions}
+                series={sentimentChartSeries}
+                type="pie"
+                width={260}
+              />
             </div>
-            <div>
-              <span className="text-muted">Compression Percentage</span>
-              <strong className="block text-primary font-bold text-sm mt-0.5">
-                {analysis.summarization_analysis.compressionRatio}%
-              </strong>
-            </div>
-            <div>
-              <span className="text-muted">Reading Time Saved</span>
-              <strong className="block text-emerald-500 font-bold text-sm mt-0.5">
-                {analysis.summarization_analysis.readingTimeSaved} min
-              </strong>
-            </div>
-            <div>
-              <span className="text-muted">Linguistic Info Retention</span>
-              <strong className="block text-amber-500 font-bold text-sm mt-0.5">
-                {analysis.summarization_analysis.informationRetention}%
-              </strong>
+
+            {/* Emotions breakdown */}
+            <div className="flex flex-col gap-2.5 text-xs">
+              <span className="text-[9px] font-bold text-muted uppercase">Emotion Spectrum Distribution</span>
+              {Object.entries(analysis.sentiment_emotion.emotions).map(([emotion, val]) => (
+                <div key={emotion} className="flex flex-col gap-1">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-muted capitalize">{emotion}</span>
+                    <strong className="text-main">{renderHighlighted(val)}%</strong>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                    <div 
+                      className="bg-primary h-full transition-all" 
+                      style={{ width: `${val}%` }} 
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </Card>
-      )}
+      </div>
+
+      {/* Row 3: Key Takeaways & Key Entities Map */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Key Takeaways Card */}
+        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
+          <div className="flex justify-between items-center border-b border-borderToken pb-2">
+            <div className="flex items-center gap-2">
+              <List className="w-4 h-4 text-emerald-500" />
+              <h3 className="font-bold text-xs font-display text-main">Key Takeaways & Action Items</h3>
+            </div>
+            <Badge variant="primary" className="text-[8px]">EXTRACTED</Badge>
+          </div>
+          <div className="flex flex-col gap-3 text-xs justify-center flex-1 py-1">
+            {takeaways.length > 0 ? (
+              takeaways.map((takeaway, idx) => (
+                <div key={idx} className="flex gap-2.5 items-start leading-relaxed text-main font-medium">
+                  <span className="flex items-center justify-center bg-primary/10 text-primary font-bold text-[9px] w-5 h-5 rounded-full shrink-0 mt-0.5">
+                    {idx + 1}
+                  </span>
+                  <span>{renderHighlighted(takeaway)}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-muted italic text-center text-[11px] py-4">No specific key takeaways could be extracted.</p>
+            )}
+          </div>
+        </Card>
+
+        {/* Key Entities Map Card */}
+        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
+          <div className="flex justify-between items-center border-b border-borderToken pb-2">
+            <div className="flex items-center gap-2">
+              <Compass className="w-4 h-4 text-indigo-500" />
+              <h3 className="font-bold text-xs font-display text-main">Key References & Mentions</h3>
+            </div>
+            <span className="text-[9px] text-muted font-bold">NER Mapping</span>
+          </div>
+
+          <div className="flex flex-col gap-3.5 text-xs justify-center flex-1">
+            {[
+              { category: "Important People", list: analysis.ner_results.Person, color: "bg-primary/10 text-primary border-primary/20" },
+              { category: "Organizations & Brands", list: analysis.ner_results.Organization, color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" },
+              { category: "Locations & Countries", list: analysis.ner_results.Location, color: "bg-pink-500/10 text-pink-500 border-pink-500/20" }
+            ].map((ent, idx) => (
+              <div key={idx} className="flex flex-col gap-1.5 border-b border-borderToken/25 pb-2.5 last:border-0 last:pb-0">
+                <span className="text-[9px] font-bold text-muted uppercase">{ent.category}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {ent.list && ent.list.length > 0 ? (
+                    ent.list.slice(0, 4).map((item: string, i: number) => (
+                      <span key={i} className={`px-2 py-0.5 rounded border text-[9px] font-semibold ${ent.color}`}>
+                        {renderHighlighted(item)}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[9px] text-muted italic">None detected</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {/* Row 4: Keywords Bar & Word Cloud */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Keywords chart */}
+        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
+          <div className="flex justify-between items-center border-b border-borderToken pb-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-pink-500" />
+              <h3 className="font-bold text-xs font-display text-main">Keywords Importance</h3>
+            </div>
+            <span className="text-[9px] text-muted font-bold">Occurrences Count</span>
+          </div>
+          <div className="h-[220px]">
+            <ReactApexChart
+              options={keywordChartOptions}
+              series={keywordChartSeries}
+              type="bar"
+              height="100%"
+            />
+          </div>
+        </Card>
+
+        {/* Word Cloud */}
+        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
+          <div className="flex justify-between items-center border-b border-borderToken pb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <h3 className="font-bold text-xs font-display text-main">Semantic Word Cloud</h3>
+            </div>
+            <span className="text-[9px] text-muted font-bold">Terms Weight</span>
+          </div>
+          <div className="flex-1 flex flex-wrap gap-x-3.5 gap-y-2.5 items-center justify-center p-3.5 bg-slate-50/50 dark:bg-slate-900/10 rounded-xl border border-borderToken select-none min-h-[220px]">
+            {wordCloudTags.map((tag, idx) => (
+              <span 
+                key={idx} 
+                className={`${tag.weight} cursor-pointer hover:scale-110 hover:text-primary transition-all duration-200`}
+              >
+                {renderHighlighted(tag.text)}
+              </span>
+            ))}
+          </div>
+        </Card>
+      </div>
 
     </div>
   );

@@ -37,12 +37,12 @@ async def upload_document(
     filename = file.filename
     contents = await file.read()
     
-    # 1. Validation: Max size 10MB
-    MAX_FILE_SIZE = 10 * 1024 * 1024
+    # 1. Validation: Max size 50MB
+    MAX_FILE_SIZE = 50 * 1024 * 1024
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File size exceeds the maximum limit of 10MB."
+            detail="File size exceeds the maximum limit of 50MB."
         )
         
     # 2. Validation: Empty file

@@ -74,21 +74,22 @@ async def request_middleware(request: Request, call_next):
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    # Rate limiting — tighter limit on auth endpoints
-    if path.startswith("/api/v1/auth/"):
-        if client_ip != "testclient" and _is_rate_limited(_auth_rate_store, client_ip, settings.AUTH_RATE_LIMIT_PER_MINUTE):
-            logger.warning(f"AUTH rate limit exceeded: IP={client_ip} PATH={path}")
-            return JSONResponse(
-                status_code=429,
-                content={"error": {"code": 429, "message": "Too many requests. Please try again later."}}
-            )
-    elif path.startswith("/api/"):
-        if client_ip != "testclient" and _is_rate_limited(_rate_store, client_ip, settings.RATE_LIMIT_PER_MINUTE):
-            logger.warning(f"API rate limit exceeded: IP={client_ip} PATH={path}")
-            return JSONResponse(
-                status_code=429,
-                content={"error": {"code": 429, "message": "Too many requests. Please try again later."}}
-            )
+    # Rate limiting — only apply in production mode
+    if settings.ENVIRONMENT == "production":
+        if path.startswith("/api/v1/auth/"):
+            if client_ip != "testclient" and _is_rate_limited(_auth_rate_store, client_ip, settings.AUTH_RATE_LIMIT_PER_MINUTE):
+                logger.warning(f"AUTH rate limit exceeded: IP={client_ip} PATH={path}")
+                return JSONResponse(
+                    status_code=429,
+                    content={"error": {"code": 429, "message": "Too many requests. Please try again later."}}
+                )
+        elif path.startswith("/api/"):
+            if client_ip != "testclient" and _is_rate_limited(_rate_store, client_ip, settings.RATE_LIMIT_PER_MINUTE):
+                logger.warning(f"API rate limit exceeded: IP={client_ip} PATH={path}")
+                return JSONResponse(
+                    status_code=429,
+                    content={"error": {"code": 429, "message": "Too many requests. Please try again later."}}
+                )
 
     response: Response = await call_next(request)
     process_time = time.time() - start_time

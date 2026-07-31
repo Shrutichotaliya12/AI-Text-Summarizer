@@ -130,6 +130,15 @@ export const useAuthStore = create<UserState>((set) => ({
       apiClient.post("/auth/logout").catch(err => console.error("Logout endpoint failed:", err));
     }).catch(e => console.error("Failed to import api client:", e));
 
+    // Disable Google Sign-in Auto-Select to force account selection next time
+    if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
+      try {
+        (window as any).google.accounts.id.disableAutoSelect();
+      } catch (err) {
+        console.error("Failed to disable Google auto-select:", err);
+      }
+    }
+
     localStorage.removeItem("token");
     localStorage.removeItem("email");
     set({ user: null, token: null, isAuthenticated: false, profile: null, notifications: [], unreadCount: 0 });
