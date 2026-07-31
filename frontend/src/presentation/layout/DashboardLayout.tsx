@@ -43,6 +43,112 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
+const RealTimeFooter: React.FC = () => {
+  const [statuses, setStatuses] = useState({
+    ai: { state: "checking", lastChecked: "" },
+    db: { state: "checking", lastChecked: "" },
+    auth: { state: "checking", lastChecked: "" },
+    email: { state: "checking", lastChecked: "" },
+    storage: { state: "checking", lastChecked: "" },
+    api: { state: "checking", lastChecked: "" }
+  });
+
+  useEffect(() => {
+    const fetchHealth = async () => {
+      const endpoints = [
+        { key: "ai", url: "/ai/health" },
+        { key: "db", url: "/db/health" },
+        { key: "auth", url: "/auth/health" },
+        { key: "email", url: "/email/health" },
+        { key: "storage", url: "/storage/health" },
+        { key: "api", url: "/health" }
+      ];
+      
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      endpoints.forEach(async ({ key, url }) => {
+        try {
+          const res = await apiClient.get(url, { timeout: 3000 });
+          setStatuses(prev => ({
+            ...prev,
+            [key]: { state: res.status === 200 ? "working" : "error", lastChecked: now }
+          }));
+        } catch {
+          setStatuses(prev => ({
+            ...prev,
+            [key]: { state: "offline", lastChecked: now }
+          }));
+        }
+      });
+    };
+
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const services = [
+    { label: "AI Service", key: "ai" },
+    { label: "Database", key: "db" },
+    { label: "Authentication", key: "auth" },
+    { label: "Email Service", key: "email" },
+    { label: "Storage", key: "storage" },
+    { label: "API Server", key: "api" }
+  ];
+
+  return (
+    <footer className="mt-12 bg-white dark:bg-[#0F172A] border-t border-slate-200 dark:border-[#1E293B] rounded-t-3xl shadow-[0_-4px_25px_-5px_rgba(0,0,0,0.1)] pt-6 pb-6 px-4 w-full transition-colors duration-500 select-none font-sans text-center relative z-10 text-slate-800 dark:text-white backdrop-blur-sm dark:bg-opacity-90">
+      <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-4">
+        
+        {/* TOP ROW: Status */}
+        <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6 text-[13.5px]">
+          {services.map((svc, idx) => {
+            const s = statuses[svc.key as keyof typeof statuses];
+            let dotColor = "bg-amber-400";
+            let textColor = "text-amber-500 dark:text-amber-400";
+            let text = "Checking...";
+            
+            if (s.state === "working") {
+              dotColor = "bg-emerald-500";
+              textColor = "text-emerald-500 dark:text-emerald-400";
+              text = "Working";
+            } else if (s.state === "offline" || s.state === "error") {
+              dotColor = "bg-red-500";
+              textColor = "text-red-500 dark:text-red-400";
+              text = "Offline";
+            }
+
+            return (
+              <div key={idx} className="flex flex-col items-center gap-1 transition-transform hover:scale-105 cursor-default group relative">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">{svc.label}:</span>
+                  <span className={`h-2.5 w-2.5 rounded-full ${dotColor} ${s.state === "working" ? "animate-pulse" : ""}`}></span>
+                  <span className={`${textColor} font-semibold`}>{text}</span>
+                </div>
+                {s.lastChecked && (
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-4 whitespace-nowrap">
+                    Checked: {s.lastChecked}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* MIDDLE ROW: Copyright & Tech Stack */}
+        <div className="text-[13.5px] text-slate-500 dark:text-slate-400 font-medium mt-4">
+          &copy; 2026 AI Text Summarizer Pro &bull; Version 1.0.0
+        </div>
+
+        {/* BOTTOM ROW: Author */}
+        <div className="text-[13.5px] text-slate-500 dark:text-slate-400 font-medium">
+          Designed & Developed by <a href="#" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold hover:underline transition-all">Shruti Chotaliya</a>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -795,55 +901,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
             {children}
           </div>
           
-          {/* Footer Redesign */}
-          <footer className="mt-12 bg-white rounded-t-3xl shadow-[0_-4px_25px_-5px_rgba(0,0,0,0.1)] pt-6 pb-6 px-4 w-full transition-opacity duration-1000 animate-in fade-in select-none font-sans text-center relative z-10">
-            <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-4">
-              
-              {/* TOP ROW: Status */}
-              <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6 text-sm">
-                {[
-                  { label: "AI Status", status: apiStatus.ai },
-                  { label: "DB Status", status: apiStatus.db },
-                  { label: "Auth", status: apiStatus.auth },
-                  { label: "Email Service", status: apiStatus.email },
-                  { label: "Storage", status: apiStatus.storage }
-                ].map((item, idx) => {
-                  const s = item.status?.toLowerCase() || "offline";
-                  let dotColor = "bg-red-500";
-                  let textColor = "text-red-500";
-                  let text = "Offline";
-                  
-                  if (s === "working" || s === "online" || s === "healthy") {
-                    dotColor = "bg-emerald-500";
-                    textColor = "text-emerald-500";
-                    text = "Working";
-                  } else if (s === "degraded" || s === "limited") {
-                    dotColor = "bg-amber-500";
-                    textColor = "text-amber-500";
-                    text = "Limited";
-                  }
-
-                  return (
-                    <div key={idx} className="flex items-center gap-1.5 transition-transform hover:scale-105 cursor-default">
-                      <span className="font-semibold text-slate-700">{item.label}:</span>
-                      <span className={`h-2.5 w-2.5 rounded-full ${dotColor} ${s === "working" ? "" : "animate-pulse"}`}></span>
-                      <span className={`${textColor} font-semibold`}>{text}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* MIDDLE ROW: Copyright & Tech Stack */}
-              <div className="text-[13.5px] text-slate-500 font-medium mt-1">
-                &copy; 2026 AI Text Summarizer Pro &bull; Built with <span className="text-rose-500 mx-0.5">❤️</span> using Python - FastAPI - Hugging Face - PyTorch &bull; Version 1.0.0 (Build 240725)
-              </div>
-
-              {/* BOTTOM ROW: Author */}
-              <div className="text-[13.5px] text-slate-500 font-medium">
-                Designed & Developed by <a href="#" className="text-blue-600 hover:text-blue-700 font-semibold hover:underline transition-all">Shruti Chotaliya</a>
-              </div>
-            </div>
-          </footer>
+          <RealTimeFooter />
         </div>
 
       </div>

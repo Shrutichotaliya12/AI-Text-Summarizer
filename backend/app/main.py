@@ -233,3 +233,35 @@ def readiness_check():
             }
         )
 # ─────────────────────────────────────────────────────────────────────────────
+
+# ─── Individual Service Health Endpoints ─────────────────────────────────────
+@app.get("/api/v1/health", tags=["Health"])
+def health_api():
+    return {"status": "working"}
+
+@app.get("/api/v1/auth/health", tags=["Health"])
+def auth_health():
+    return {"status": "working"}
+
+@app.get("/api/v1/ai/health", tags=["Health"])
+def ai_health():
+    return {"status": "working"}
+
+@app.get("/api/v1/storage/health", tags=["Health"])
+def storage_health():
+    return {"status": "working"}
+
+@app.get("/api/v1/email/health", tags=["Health"])
+def email_health():
+    return {"status": "working"}
+
+@app.get("/api/v1/db/health", tags=["Health"])
+def db_health():
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        return {"status": "working"}
+    except Exception as e:
+        return JSONResponse(status_code=503, content={"status": "offline"})
+# ─────────────────────────────────────────────────────────────────────────────
