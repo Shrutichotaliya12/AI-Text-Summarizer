@@ -76,7 +76,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Syntax / import validation
-        run: python -c "import ast, os; [ast.parse(open(f).read()) for r,d,files in os.walk('app') for f in files if f.endswith('.py')]"
+        run: python -c "import ast, os; [ast.parse(open(os.path.join(r, f)).read()) for r,d,files in os.walk('../backend/app') for f in files if f.endswith('.py')]"
 
       - name: Run pytest suite
         run: |
