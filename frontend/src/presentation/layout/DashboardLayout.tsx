@@ -107,30 +107,30 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
 
   const checkHealth = async () => {
     try {
-      const response = await apiClient.get("/models/ready");
+      const response = await apiClient.get("/system/status");
       if (response.data) {
         setApiStatus({
-          ai: response.data.ai === "connected" ? "Working" : "Offline",
-          db: response.data.database === "connected" ? "Working" : "Offline",
-          auth: response.data.auth === "connected" ? "Working" : "Offline",
-          email: response.data.email === "connected" ? "Working" : "Offline",
-          storage: response.data.storage === "connected" ? "Working" : "Offline"
+          ai: response.data.ai,
+          db: response.data.database,
+          auth: response.data.authentication,
+          email: response.data.email,
+          storage: response.data.storage
         });
       }
     } catch (error) {
       setApiStatus({
-        ai: "Offline",
-        db: "Offline",
-        auth: "Offline",
-        email: "Offline",
-        storage: "Offline"
+        ai: "offline",
+        db: "offline",
+        auth: "offline",
+        email: "offline",
+        storage: "offline"
       });
     }
   };
 
   useEffect(() => {
     checkHealth();
-    const interval = setInterval(checkHealth, 10000); // Check every 10s
+    const interval = setInterval(checkHealth, 30000); // Check every 30s
     return () => clearInterval(interval);
   }, []);
 
@@ -792,18 +792,47 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
             {children}
           </div>
           
-          <footer className="mt-12 border-t border-borderToken/60 pt-6 text-center text-[10px] text-muted font-medium select-none">
+          <footer className="mt-12 border-t border-borderToken/60 pt-6 pb-6 flex flex-col items-center justify-center text-center select-none">
             {/* Live status widget */}
-            <div className="flex flex-wrap justify-center gap-4 mb-4 text-[9px] font-bold">
-              <span className="flex items-center gap-1">AI Status: <span className={`h-1.5 w-1.5 rounded-full ${apiStatus.ai === "Working" ? "bg-emerald-500" : "bg-red-500"}`} /> <span className={apiStatus.ai === "Working" ? "text-emerald-500" : "text-red-500"}>{apiStatus.ai}</span></span>
-              <span className="flex items-center gap-1">DB Status: <span className={`h-1.5 w-1.5 rounded-full ${apiStatus.db === "Working" ? "bg-emerald-500" : "bg-red-500"}`} /> <span className={apiStatus.db === "Working" ? "text-emerald-500" : "text-red-500"}>{apiStatus.db}</span></span>
-              <span className="flex items-center gap-1">Auth: <span className={`h-1.5 w-1.5 rounded-full ${apiStatus.auth === "Working" ? "bg-emerald-500" : "bg-red-500"}`} /> <span className={apiStatus.auth === "Working" ? "text-emerald-500" : "text-red-500"}>{apiStatus.auth}</span></span>
-              <span className="flex items-center gap-1">Email Service: <span className={`h-1.5 w-1.5 rounded-full ${apiStatus.email === "Working" ? "bg-emerald-500" : "bg-red-500"}`} /> <span className={apiStatus.email === "Working" ? "text-emerald-500" : "text-red-500"}>{apiStatus.email}</span></span>
-              <span className="flex items-center gap-1">Storage: <span className={`h-1.5 w-1.5 rounded-full ${apiStatus.storage === "Working" ? "bg-emerald-500" : "bg-red-500"}`} /> <span className={apiStatus.storage === "Working" ? "text-emerald-500" : "text-red-500"}>{apiStatus.storage}</span></span>
+            <div className="flex flex-wrap justify-center gap-6 mb-6 text-[11px] font-bold tracking-wide">
+              {[
+                { label: "AI Status", status: apiStatus.ai },
+                { label: "Database", status: apiStatus.db },
+                { label: "Authentication", status: apiStatus.auth },
+                { label: "Email Service", status: apiStatus.email },
+                { label: "Storage", status: apiStatus.storage }
+              ].map((item, idx) => {
+                const s = item.status?.toLowerCase() || "offline";
+                let colorClass = "bg-red-500 text-red-500";
+                let dotClass = "bg-red-500";
+                let text = "Offline";
+                if (s === "working") {
+                  colorClass = "text-emerald-500";
+                  dotClass = "bg-emerald-500";
+                  text = "Working";
+                } else if (s === "degraded") {
+                  colorClass = "text-amber-500";
+                  dotClass = "bg-amber-500";
+                  text = "Limited";
+                }
+                
+                return (
+                  <span key={idx} className="flex items-center gap-1.5 uppercase">
+                    {item.label}:
+                    <span className={`h-2 w-2 rounded-full ${dotClass} shadow-[0_0_8px_currentColor]`} style={{ color: dotClass.replace('bg-', '') }} />
+                    <span className={colorClass}>{text}</span>
+                  </span>
+                );
+              })}
             </div>
-            <p>
-              &copy; 2026 AI Text Summarizer Pro &bull; Built with ❤️ using Python - FastAPI - Hugging Face - PyTorch &bull; Version 1.0.0 (Build 240725)
-            </p>
+            
+            <div className="text-[11px] text-muted font-medium flex flex-col gap-1.5">
+              <p>&copy; 2026 AI Text Summarizer Pro</p>
+              <p>Built with ❤️ using Python &bull; FastAPI &bull; React &bull; Vite &bull; Hugging Face &bull; PyTorch</p>
+              <p>Version 1.0.0</p>
+              <p className="mt-3 font-display text-xs">Designed & Developed by</p>
+              <p className="font-bold text-main tracking-widest uppercase">Shruti Chotaliya</p>
+            </div>
           </footer>
         </div>
 

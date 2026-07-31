@@ -26,6 +26,7 @@ from app.features.admin.router import router as admin_router
 from app.features.notifications.router import router as notifications_router
 from app.features.document_analysis.router import router as analysis_router
 from app.features.rouge.router import router as rouge_router
+from app.features.system.router import router as system_router
 
 # ─── In-memory sliding window rate limiter ───────────────────────────────────
 # Stores: { ip: [timestamp, ...] }
@@ -190,6 +191,7 @@ app.include_router(history_router,        prefix="/api/v1/history",       tags=[
 app.include_router(models_router,         prefix="/api/v1/models",        tags=["Models"])
 app.include_router(admin_router,          prefix="/api/v1/admin",         tags=["Admin"])
 app.include_router(notifications_router,  prefix="/api/v1/notifications", tags=["Notifications"])
+app.include_router(system_router,         prefix="/api/system",           tags=["System Status"])
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ─── Health / Readiness / Liveness Endpoints ─────────────────────────────────

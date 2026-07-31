@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = Field(default=587, validation_alias="SMTP_PORT")
     SMTP_USER: str = Field(default="", validation_alias="SMTP_USER")
     SMTP_PASSWORD: str = Field(default="", validation_alias="SMTP_PASSWORD")
-    SMTP_FROM_EMAIL: str = Field(default="noreply@summarizer.pro", validation_alias="SMTP_FROM_EMAIL")
+    SMTP_FROM_EMAIL: str = Field(default="AI Text Summarizer Pro <textsummarizer.ai@gmail.com>", validation_alias="SMTP_FROM_EMAIL")
 
     @field_validator("JWT_SECRET")
     @classmethod
@@ -59,6 +59,14 @@ class Settings(BaseSettings):
         env = info.data.get("ENVIRONMENT", "development")
         if env == "production" and v == "supersecret_jwttokens_key_for_development":
             raise ValueError("JWT_SECRET must be set to a secure value in production!")
+        return v
+
+    @field_validator("SMTP_USER")
+    @classmethod
+    def validate_smtp_user(cls, v, info):
+        if v and v != "textsummarizer.ai@gmail.com":
+            print(f"[SECURITY ERROR] Refusing SMTP initialization. Invalid developer email: {v}")
+            raise ValueError("SMTP_USER must be exactly textsummarizer.ai@gmail.com")
         return v
 
     @property

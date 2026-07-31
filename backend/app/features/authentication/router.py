@@ -239,18 +239,13 @@ def get_welcome_email_html(name: str) -> str:
 def send_real_email(to_email: str, subject: str, html_body: str, text_body: str = None, otp_hash: str = None):
     import smtplib
     import socket
+    import time
     from app.infrastructure.logger import logger
     
-    # Subject Whitelist Check
+    # STRICT WHITELIST
     allowed_subjects = [
-        "verify your email address",
         "verify your ai text summarizer account",
-        "welcome to ai text summarizer pro!",
-        "password reset request",
-        "verification code (signup)",
-        "verification code (forgot_password)",
-        "verification code (change_password)",
-        "verification code (delete_account)"
+        "welcome to ai text summarizer pro!"
     ]
     
     subject_lower = subject.lower()
@@ -261,57 +256,68 @@ def send_real_email(to_email: str, subject: str, html_body: str, text_body: str 
             break
             
     if not is_allowed:
-        print(f"\n[SMTP SECURITY] Email dispatch blocked. Subject '{subject}' is not in the whitelist.")
-        logger.info(f"Email dispatch blocked by security policy. Subject: '{subject}' to: '{to_email}'")
+        error_msg = f"[SMTP SECURITY] Email blocked. Subject '{subject}' is strictly forbidden by policy."
+        print(f"\n{error_msg}")
+        logger.error(error_msg)
         return
         
     print("\n--- SMTP DISPATCH AUDIT ---")
-    print(f"1. Recipient Email: {to_email}")
-    print(f"2. Subject: {subject}")
-    print(f"3. First 150 characters of email body:\n{html_body[:150]}...")
+    print(f"Recipient: {to_email}")
+    print(f"Subject: {subject}")
     
     if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        print("[OTP SMTP INFO] SMTP settings not configured. Simulation succeeded.")
+        print("[OTP SMTP INFO] SMTP credentials not set. Simulated success.")
         return
         
-    try:
-        msg = MIMEMultipart("alternative")
-        msg['Subject'] = subject
-        msg['From'] = settings.SMTP_FROM_EMAIL
-        msg['To'] = to_email
+    if settings.SMTP_USER != "textsummarizer.ai@gmail.com":
+        error_msg = f"[SMTP SECURITY] Refusing to send from unauthorized email: {settings.SMTP_USER}"
+        print(error_msg)
+        logger.error(error_msg)
+        return
         
-        # Add Message-ID header
-        import time
-        import random
-        msg_id = f"<{time.time()}-{random.randint(100000, 999999)}@summarizer.pro>"
-        msg['Message-ID'] = msg_id
-        print(f"4. Custom Message-ID Header: {msg_id}")
+    msg = MIMEMultipart("alternative")
+    msg['Subject'] = subject
+    msg['From'] = settings.SMTP_FROM_EMAIL
+    msg['To'] = to_email
+    
+    msg_id = f"<{time.time()}-{random.randint(100000, 999999)}@summarizer.pro>"
+    msg['Message-ID'] = msg_id
 
-        if otp_hash:
-            log_email_sent(to_email, subject, otp_hash)
+    if text_body:
+        msg.attach(MIMEText(text_body, "plain"))
+    else:
+        clean_text = re.sub('<[^<]+?>', '', html_body)
+        msg.attach(MIMEText(clean_text, "plain"))
+        
+    msg.attach(MIMEText(html_body, "html"))
 
-        if text_body:
-            msg.attach(MIMEText(text_body, "plain"))
-        else:
-            clean_text = re.sub('<[^<]+?>', '', html_body)
-            msg.attach(MIMEText(clean_text, "plain"))
-            
-        msg.attach(MIMEText(html_body, "html"))
-
-        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
-        server.set_debuglevel(1)
+    def attempt_delivery():
+        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
         server.starttls()
         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        print("5. Executing sendmail...")
-        smtp_res = server.sendmail(settings.SMTP_FROM_EMAIL, [to_email], msg.as_string())
-        print(f"6. SMTP Sendmail command result: {smtp_res}")
+        server.sendmail(settings.SMTP_FROM_EMAIL, [to_email], msg.as_string())
         server.quit()
-        print("7. SMTP Connection closed safely.\n---------------------------\n")
+        
+    try:
+        attempt_delivery()
+        status = "Success"
+        print("SMTP Send successful.")
     except Exception as e:
-        print(f"[OTP SMTP ERROR] Failed to send real email to {to_email}: {e}")
-        logger.error(f"Email delivery failed to {to_email} with error: {e}", exc_info=True)
-        # Log error once and stop retrying automatically (do not raise exception to client, preventing client/network retry)
-        return
+        print(f"[SMTP RETRY] Temporary failure: {e}. Retrying once...")
+        try:
+            time.sleep(1)
+            attempt_delivery()
+            status = "Success (after retry)"
+            print("SMTP Send successful on retry.")
+        except Exception as e2:
+            status = f"Failed: {e2}"
+            print(f"[SMTP ERROR] Final failure: {e2}")
+            logger.error(f"Email delivery failed to {to_email}: {e2}")
+            
+    # AUDIT LOGGING without OTP values
+    with open("backend/logs/email_audit.log", "a") as f:
+        timestamp = datetime.utcnow().isoformat()
+        f.write(f"[{timestamp}] Type: '{subject}' | Recipient: {to_email} | Status: {status}\n")
 
 def check_otp_resend_limit(user: User):
     if user.otp_sent_at:
