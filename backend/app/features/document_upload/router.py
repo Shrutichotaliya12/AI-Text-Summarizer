@@ -1,12 +1,9 @@
 import time
-from io import BytesIO
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, File, UploadFile, HTTPException, status, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-import pypdf
-import docx
 
 from app.shared.database import get_db
 from app.shared.models import Document, ActivityLog, UserSettings, DocumentChunk
@@ -113,7 +110,7 @@ async def upload_document(
         word_count=word_count,
         char_count=char_count,
         upload_time=new_date_str(),
-        last_modified=datetime.utcnow(),
+        last_modified=datetime.now(timezone.utc).replace(tzinfo=None),
         status="ready",
         page_count=pages,
         original_file_bytes=contents,
@@ -187,7 +184,7 @@ def scrape_url(
         word_count=word_count,
         char_count=char_count,
         upload_time=new_date_str(),
-        last_modified=datetime.utcnow(),
+        last_modified=datetime.now(timezone.utc).replace(tzinfo=None),
         status="ready",
         page_count=1,
         is_favorite=False
@@ -290,7 +287,7 @@ def get_user_documents(
         elif filter_type == "large":
             query = query.filter(Document.size.like("% MB"))
         elif filter_type == "recent_upload":
-            cutoff = datetime.utcnow() - timedelta(days=1)
+            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
             query = query.filter(Document.last_modified >= cutoff)
             
     # 3. Sorting mappings
@@ -367,7 +364,7 @@ def update_user_document(
         doc.word_count = len(payload.text.split())
         doc.char_count = len(payload.text)
         
-    doc.last_modified = datetime.utcnow()
+    doc.last_modified = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(doc)
     
@@ -394,7 +391,7 @@ def delete_user_document(
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
         
-    doc.deleted_at = datetime.utcnow()
+    doc.deleted_at = datetime.now(timezone.utc).replace(tzinfo=None)
     
     log = ActivityLog(user_id=current_user.id, action="DOCUMENT_DELETE", details=f"Soft-deleted document {doc.name}")
     db.add(log)
@@ -410,7 +407,7 @@ def get_trash_documents(
     # Auto-cleanup based on UserSettings trash_clear_days
     user_settings = db.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
     clear_days = user_settings.trash_clear_days if (user_settings and user_settings.trash_clear_days is not None) else 30
-    cutoff = datetime.utcnow() - timedelta(days=clear_days)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=clear_days)
     db.query(Document).filter(Document.user_id == current_user.id, Document.deleted_at < cutoff).delete()
     db.commit()
 

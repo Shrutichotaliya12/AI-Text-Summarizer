@@ -45,7 +45,6 @@ def get_db():
 
 # Auto create tables on boot
 try:
-    import app.shared.models
     Base.metadata.create_all(bind=engine)
 except Exception as e:
     print(f"DB auto-initialization exception: {e}")

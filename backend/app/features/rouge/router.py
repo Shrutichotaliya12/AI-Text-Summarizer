@@ -1,14 +1,13 @@
 import re
 import json
 import time
-from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.shared.database import get_db
-from app.shared.models import ROUGEReport, Document, Summary
+from app.shared.models import ROUGEReport, Document
 from app.features.authentication.router import get_current_user, User
 
 router = APIRouter()

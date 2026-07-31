@@ -1,20 +1,18 @@
 import os
 import shutil
-import uuid
 import psutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.shared.database import get_db, engine
+from app.shared.database import get_db
 from app.shared.models import (
     User, Profile, UserSettings, ActivityLog, Document, Summary,
-    ROUGEReport, LoginHistory, RefreshToken,
-    AdminAuditLog, SystemConfiguration, AdminAnnouncement, BackupHistory
+    ROUGEReport, RefreshToken, AdminAuditLog,
+    SystemConfiguration, AdminAnnouncement, BackupHistory
 )
 from app.features.authentication.router import get_current_user, hash_password
 
@@ -98,7 +96,7 @@ def log_audit(db: Session, admin: User, action: str, target: str = None, status_
 # ─────────────────────────────────────────
 @router.get("/dashboard")
 def get_admin_dashboard(db: Session = Depends(get_db), current_user: User = Depends(verify_role(["super_admin", "admin", "moderator"]))):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     today_start = datetime(now.year, now.month, now.day)
 
     total_users = db.query(User).count()
@@ -156,7 +154,6 @@ def get_admin_dashboard(db: Session = Depends(get_db), current_user: User = Depe
             "documents_uploaded": docs_uploaded,
             "documents_processed": docs_processed,
             "summaries_generated": summaries_generated,
-            "chats_created": chats_created,
             "rouge_evaluations": rouge_evals,
             "storage_used": storage_used_label,
             "storage_used_bytes": total_bytes,
@@ -434,7 +431,7 @@ def get_extended_health(db: Session = Depends(get_db), current_user: User = Depe
 
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "services": {
             "api": "Healthy",
             "database": db_status,
@@ -460,9 +457,6 @@ def get_storage_breakdown(db: Session = Depends(get_db), current_user: User = De
     summaries = db.query(Summary).all()
     sum_bytes = sum(len(s.summary_text) for s in summaries)
     
-    chats = db.query(ChatMessage).all()
-    chat_bytes = sum(len(c.message) for c in chats)
-
     logs = db.query(ActivityLog).all()
     log_bytes = sum(len(str(l.details)) for l in logs)
 
@@ -470,15 +464,15 @@ def get_storage_breakdown(db: Session = Depends(get_db), current_user: User = De
         if b >= 1024*1024: return f"{b/(1024*1024):.2f} MB"
         return f"{b/1024:.2f} KB"
 
-    total = doc_bytes + sum_bytes + chat_bytes + log_bytes
+    total = doc_bytes + sum_bytes + log_bytes
     return {
         "total": fmt(total),
         "total_bytes": total,
         "breakdown": [
             {"category": "Documents", "size": fmt(doc_bytes), "bytes": doc_bytes, "color": "#3b82f6"},
             {"category": "Summaries", "size": fmt(sum_bytes), "bytes": sum_bytes, "color": "#8b5cf6"},
-            {"category": "Chats", "size": fmt(chat_bytes), "bytes": chat_bytes, "color": "#10b981"},
             {"category": "Audit & Activity Logs", "size": fmt(log_bytes), "bytes": log_bytes, "color": "#f59e0b"}
+
         ]
     }
 
@@ -550,7 +544,7 @@ def list_announcements(db: Session = Depends(get_db)):
 
 @router.post("/announcements")
 def create_announcement(payload: AnnouncementPayload, request: Request, db: Session = Depends(get_db), current_user: User = Depends(verify_role(["super_admin", "admin"]))):
-    expiry = datetime.utcnow() + timedelta(days=payload.expires_in_days)
+    expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=payload.expires_in_days)
     ann = AdminAnnouncement(
         title=payload.title,
         content=payload.content,
@@ -580,7 +574,7 @@ def trigger_backup(request: Request, db: Session = Depends(get_db), current_user
 
     backups_dir = os.path.join(backend_dir, "backups")
     os.makedirs(backups_dir, exist_ok=True)
-    filename = f"backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.db"
+    filename = f"backup_{datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y%m%d_%H%M%S')}.db"
     dest = os.path.join(backups_dir, filename)
 
     try:

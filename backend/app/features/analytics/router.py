@@ -1,15 +1,11 @@
-import time
-import random
-import re
 import json
-from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.shared.database import get_db
-from app.shared.models import User, Document, Summary, UserSettings, ROUGEReport, ActivityLog
+from app.shared.models import User, Document, Summary, ROUGEReport, ActivityLog
 from app.features.authentication.router import get_current_user
 
 try:
@@ -51,7 +47,6 @@ def calculate_doc_size_mb(size_str: str) -> float:
 def get_user_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     summaries = db.query(Summary).filter(Summary.user_id == current_user.id).all()
     docs_count = db.query(Document).filter(Document.user_id == current_user.id, Document.deleted_at == None).count()
-    chats_count = db.query(ChatSession).filter(ChatSession.user_id == current_user.id).count()
     
     total_words_saved = 0
     total_reading_time_saved = 0.0
@@ -96,8 +91,7 @@ def get_user_stats(current_user: User = Depends(get_current_user), db: Session =
             "cpu_usage": cpu,
             "ram_usage": ram,
             "gpu_usage": "N/A",
-            "vram_allocated": "N/A",
-            "chats_count": chats_count
+            "vram_allocated": "N/A"
         }
     }
 
@@ -112,7 +106,7 @@ def get_performance_stats(
     # 1. Base counts & scoping queries
     if is_admin_flag:
         users_count = db.query(User).count()
-        active_users = db.query(User).filter(User.created_at >= datetime.utcnow() - timedelta(days=30)).count()
+        active_users = db.query(User).filter(User.created_at >= datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)).count()
         docs_query = db.query(Document).filter(Document.deleted_at == None)
         sums_query = db.query(Summary)
     else:
@@ -127,7 +121,7 @@ def get_performance_stats(
     total_sums = len(summaries)
     
     # Processing today
-    cutoff_24h = datetime.utcnow() - timedelta(hours=24)
+    cutoff_24h = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
     if is_admin_flag:
         docs_today = db.query(Document).filter(Document.last_modified >= cutoff_24h, Document.deleted_at == None).count()
         sums_today = db.query(Summary).filter(Summary.created_at >= cutoff_24h).count()

@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import Request
 from app.shared.models import User
 
@@ -39,7 +39,7 @@ def log_otp_generation(request: Request, user: User, otp: str, reason: str) -> s
     otp_hash = hashlib.sha256(otp.encode()).hexdigest()
     
     log_entry = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "api_endpoint": endpoint,
         "client_ip": ip,
         "user_agent": ua,
@@ -54,7 +54,7 @@ def log_otp_generation(request: Request, user: User, otp: str, reason: str) -> s
 
 def log_email_sent(to_email: str, subject: str, otp_hash: str):
     log_entry = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "to_email": to_email,
         "subject": subject,
         "otp_hash": otp_hash

@@ -1,7 +1,7 @@
 import json
-from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, status
-from fastapi.responses import StreamingResponse, Response
+from datetime import datetime, timezone
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.shared.database import get_db
@@ -105,7 +105,7 @@ def force_refresh_analysis(
     analysis.pos_distribution = json.dumps(nlp_res["pos_distribution"])
     analysis.sentiment_emotion = json.dumps(nlp_res["sentiment_emotion"])
     analysis.topics = json.dumps(nlp_res["topics"])
-    analysis.updated_at = datetime.utcnow()
+    analysis.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     
     db.commit()
     return {"status": "success", "message": "Analysis refreshed successfully."}

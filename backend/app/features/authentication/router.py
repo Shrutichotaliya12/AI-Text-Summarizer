@@ -1,11 +1,10 @@
 import os
 import random
 import secrets
-import smtplib
 import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
@@ -14,8 +13,8 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from app.infrastructure.config import settings
 from app.shared.database import get_db
-from app.shared.models import User, Profile, UserSettings, ActivityLog, Document, Summary, ROUGEReport, LoginHistory, RefreshToken, PasswordHistory
-from app.core.audit import log_otp_generation, log_email_sent
+from app.shared.models import User, Profile, UserSettings, ActivityLog, Document, Summary, ROUGEReport, LoginHistory, RefreshToken
+from app.core.audit import log_otp_generation
 
 router = APIRouter()
 
@@ -136,9 +135,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc).replace(tzinfo=None) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
@@ -239,7 +238,6 @@ def get_welcome_email_html(name: str) -> str:
 
 def send_real_email(to_email: str, subject: str, html_body: str, text_body: str = None, otp_hash: str = None):
     import smtplib
-    import socket
     import time
     from app.infrastructure.logger import logger
     
@@ -318,12 +316,12 @@ def send_real_email(to_email: str, subject: str, html_body: str, text_body: str 
     # AUDIT LOGGING without OTP values
     os.makedirs(os.path.dirname("logs/email_audit.log"), exist_ok=True)
     with open("logs/email_audit.log", "a") as f:
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         f.write(f"[{timestamp}] Type: '{subject}' | Recipient: {to_email} | Status: {status}\n")
 
 def check_otp_resend_limit(user: User):
     if user.otp_sent_at:
-        elapsed = (datetime.utcnow() - user.otp_sent_at).total_seconds()
+        elapsed = (datetime.now(timezone.utc).replace(tzinfo=None) - user.otp_sent_at).total_seconds()
         if elapsed < 60:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -368,7 +366,7 @@ def register(user: UserRegister, request: Request, db: Session = Depends(get_db)
     
     # Generate OTP
     otp = "".join([str(random.randint(0, 9)) for _ in range(6)])
-    expiry = datetime.utcnow() + timedelta(minutes=5)
+    expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5)
     
     hashed = hash_password(user.password)
     new_user = User(
@@ -377,7 +375,7 @@ def register(user: UserRegister, request: Request, db: Session = Depends(get_db)
         is_verified=False,
         otp_secret=otp,
         otp_expiry=expiry,
-        otp_sent_at=datetime.utcnow()
+        otp_sent_at=datetime.now(timezone.utc).replace(tzinfo=None)
     )
     
     db.add(new_user)
@@ -419,7 +417,7 @@ def verify_otp(payload: OtpVerifyRequest, response: Response, request: Request =
     if not user.otp_secret or user.otp_secret != payload.otp:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP code")
         
-    if user.otp_expiry < datetime.utcnow():
+    if user.otp_expiry < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP code expired")
         
     if payload.action == "signup":
@@ -468,7 +466,7 @@ def verify_otp(payload: OtpVerifyRequest, response: Response, request: Request =
             token=refresh_token_str,
             device_info=user_agent,
             ip_address=ip_addr,
-            expires_at=datetime.utcnow() + timedelta(days=30)
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30)
         )
         db.add(db_token)
         db.commit()
@@ -540,11 +538,11 @@ def login(user: UserLogin, response: Response, request: Request = None, db: Sess
     if not db_user.is_verified:
         # Generate verification OTP only if expired or not set, but DO NOT send email automatically during login.
         # Verification emails should only be sent during registration or when resend is explicitly requested.
-        if not db_user.otp_secret or db_user.otp_expiry < datetime.utcnow():
+        if not db_user.otp_secret or db_user.otp_expiry < datetime.now(timezone.utc).replace(tzinfo=None):
             otp = "".join([str(random.randint(0, 9)) for _ in range(6)])
             db_user.otp_secret = otp
-            db_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
-            db_user.otp_sent_at = datetime.utcnow()
+            db_user.otp_expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5)
+            db_user.otp_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.commit()
             log_otp_generation(request, db_user, otp, "Login Renewal")
         else:
@@ -631,7 +629,7 @@ def login(user: UserLogin, response: Response, request: Request = None, db: Sess
         token=refresh_token_str,
         device_info=ua,
         ip_address=ip,
-        expires_at=datetime.utcnow() + timedelta(days=days_expiry)
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=days_expiry)
     )
     db.add(db_token)
     db.commit()
@@ -684,7 +682,7 @@ def refresh_token_endpoint(
             detail="Invalid or revoked refresh token"
         )
         
-    if db_token.expires_at < datetime.utcnow():
+    if db_token.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         db_token.is_revoked = True
         db.commit()
         raise HTTPException(
@@ -705,7 +703,7 @@ def refresh_token_endpoint(
         token=new_token_str,
         device_info=request.headers.get("User-Agent", "Unknown"),
         ip_address=request.client.host if request.client else "127.0.0.1",
-        expires_at=datetime.utcnow() + timedelta(days=30)
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30)
     )
     db.add(new_db_token)
     db.commit()
@@ -840,8 +838,8 @@ def resend_otp(payload: ResendOtpRequest, request: Request, db: Session = Depend
     check_otp_resend_limit(user)
     otp = "".join([str(random.randint(0, 9)) for _ in range(6)])
     user.otp_secret = otp
-    user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
-    user.otp_sent_at = datetime.utcnow()
+    user.otp_expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5)
+    user.otp_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     
     otp_hash = log_otp_generation(request, user, otp, "Resend OTP")
@@ -882,8 +880,8 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Sessio
     print(f"[FORGOT PASSWORD FLOW] 3. Generated OTP: {otp}")
     
     user.otp_secret = otp
-    user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
-    user.otp_sent_at = datetime.utcnow()
+    user.otp_expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5)
+    user.otp_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     print("[FORGOT PASSWORD FLOW] 4. OTP successfully saved to database.")
     
@@ -916,7 +914,7 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     if not user.otp_secret or user.otp_secret != payload.otp:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP code")
         
-    if user.otp_expiry < datetime.utcnow():
+    if user.otp_expiry < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP code expired")
         
     validate_password_strength(payload.new_password)
@@ -942,8 +940,8 @@ def change_password(payload: ChangePasswordRequest, current_user: User = Depends
     check_otp_resend_limit(current_user)
     otp = "".join([str(random.randint(0, 9)) for _ in range(6)])
     current_user.otp_secret = otp
-    current_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
-    current_user.otp_sent_at = datetime.utcnow()
+    current_user.otp_expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5)
+    current_user.otp_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     
     profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
@@ -963,7 +961,7 @@ def verify_change_password(payload: VerifyChangePasswordRequest, current_user: U
     if not current_user.otp_secret or current_user.otp_secret != payload.otp:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP code")
         
-    if current_user.otp_expiry < datetime.utcnow():
+    if current_user.otp_expiry < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP code expired")
         
     validate_password_strength(payload.new_password)
@@ -989,8 +987,8 @@ def delete_account(payload: DeleteAccountPayload, current_user: User = Depends(g
     check_otp_resend_limit(current_user)
     otp = "".join([str(random.randint(0, 9)) for _ in range(6)])
     current_user.otp_secret = otp
-    current_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
-    current_user.otp_sent_at = datetime.utcnow()
+    current_user.otp_expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5)
+    current_user.otp_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     
     profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
@@ -1010,7 +1008,7 @@ def confirm_delete_account(payload: ConfirmDeleteAccountPayload, current_user: U
     if not current_user.otp_secret or current_user.otp_secret != payload.otp:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP code")
         
-    if current_user.otp_expiry < datetime.utcnow():
+    if current_user.otp_expiry < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP code expired")
         
     # Deleting user will trigger CASCADE constraints on foreign keys
@@ -1030,8 +1028,8 @@ def request_email_change(payload: EmailChangeRequest, current_user: User = Depen
     
     otp = "".join([str(random.randint(0, 9)) for _ in range(6)])
     current_user.otp_secret = otp
-    current_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
-    current_user.otp_sent_at = datetime.utcnow()
+    current_user.otp_expiry = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5)
+    current_user.otp_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     
     profile = db.query(Profile).filter(Profile.user_id == current_user.id).first()
@@ -1051,7 +1049,7 @@ def verify_email_change(payload: EmailChangeVerifyRequest, current_user: User = 
     if not current_user.otp_secret or current_user.otp_secret != payload.otp:
         raise HTTPException(status_code=400, detail="Invalid OTP code")
         
-    if current_user.otp_expiry < datetime.utcnow():
+    if current_user.otp_expiry < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=400, detail="OTP expired")
         
     # Check if new email is taken in the meantime
@@ -1502,7 +1500,7 @@ def update_full_profile(payload: FullProfileUpdate, current_user: User = Depends
     if fn or ln:
         profile.name = f"{fn} {ln}".strip()
 
-    profile.last_active = datetime.utcnow()
+    profile.last_active = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
 
     log = ActivityLog(user_id=current_user.id, action="PROFILE_EXTENDED_UPDATE", details="User updated extended profile")
@@ -1594,7 +1592,7 @@ def delete_avatar(current_user: User = Depends(get_current_user), db: Session = 
 @router.get("/sessions")
 def get_sessions(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """List all active (non-revoked, non-expired) refresh token sessions."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     active_tokens = db.query(RefreshToken).filter(
         RefreshToken.user_id == current_user.id,
         RefreshToken.is_revoked == False,
@@ -1661,7 +1659,7 @@ def export_user_data(current_user: User = Depends(get_current_user), db: Session
     rouge_reports = db.query(ROUGEReport).filter(ROUGEReport.user_id == current_user.id).all()
 
     export = {
-        "exported_at": datetime.utcnow().isoformat(),
+        "exported_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         "profile": {
             "id": current_user.id,
             "email": current_user.email,
@@ -1820,7 +1818,7 @@ def get_login_history(current_user: User = Depends(get_current_user), db: Sessio
 def cleanup_storage(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Permanently delete soft-deleted documents and orphaned data."""
     from datetime import timedelta
-    cutoff = datetime.utcnow() - timedelta(days=0)  # Delete all soft-deleted immediately
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=0)  # Delete all soft-deleted immediately
     deleted = db.query(Document).filter(
         Document.user_id == current_user.id,
         Document.deleted_at != None

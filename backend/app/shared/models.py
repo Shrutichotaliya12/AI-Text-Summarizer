@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, Float, Boolean, Text, ForeignKey, DateTime, LargeBinary
 from sqlalchemy.orm import relationship
 from app.shared.database import Base
@@ -17,7 +17,7 @@ class User(Base):
     otp_secret = Column(String, nullable=True)
     otp_expiry = Column(DateTime, nullable=True)
     otp_sent_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Relationships
     profile = relationship("Profile", uselist=False, back_populates="user", cascade="all, delete-orphan")
@@ -73,7 +73,7 @@ class Document(Base):
     word_count = Column(Integer, nullable=False)
     char_count = Column(Integer, nullable=False)
     upload_time = Column(String, nullable=False)
-    last_modified = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_modified = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None), onupdate=datetime.now(timezone.utc).replace(tzinfo=None))
     status = Column(String, default="ready") # "ready", "processing", "error"
     tags = Column(String, nullable=True) # Comma separated
     notes = Column(Text, nullable=True)
@@ -106,7 +106,7 @@ class Summary(Base):
     keywords = Column(String, nullable=False) # Comma separated
     is_favorite = Column(Boolean, default=False)
     latency = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
     deleted_at = Column(DateTime, nullable=True)
 
     # Relationships
@@ -156,7 +156,7 @@ class ROUGEReport(Base):
     generation_time = Column(Float, default=0.0)
     
     comparison_metadata = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Relationships
     user = relationship("User", back_populates="rouge_reports")
@@ -290,7 +290,7 @@ class ActivityLog(Base):
     device = Column(String, nullable=True)
     browser = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Relationships
     user = relationship("User", back_populates="activity_logs")
@@ -306,8 +306,8 @@ class LoginHistory(Base):
     country = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
     status = Column(String, default="success")  # success / failed
-    last_activity = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    last_activity = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Relationships
     user = relationship("User", back_populates="login_histories")
@@ -320,7 +320,7 @@ class PasswordHistory(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     hashed_password = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Relationships
     user = relationship("User")
@@ -334,7 +334,7 @@ class RefreshToken(Base):
     token = Column(String, unique=True, index=True, nullable=False)
     device_info = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
     expires_at = Column(DateTime, nullable=False)
     is_revoked = Column(Boolean, default=False)
 
@@ -357,7 +357,7 @@ class Notification(Base):
     source_module = Column(String, nullable=True)
     related_document_id = Column(String, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Relationships
     user = relationship("User", back_populates="notifications")
@@ -378,8 +378,8 @@ class DocumentAnalysis(Base):
     sentiment_emotion = Column(Text, nullable=False)
     topics = Column(Text, nullable=False)
     summarization_analysis = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None), onupdate=datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Relationships
     document = relationship("Document")
@@ -397,7 +397,7 @@ class AdminAuditLog(Base):
     ip_address = Column(String, nullable=True)
     browser = Column(String, nullable=True)
     status = Column(String, default="success")  # success, failed
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
 
     admin = relationship("User")
 
@@ -409,7 +409,7 @@ class SystemConfiguration(Base):
     key = Column(String, unique=True, index=True, nullable=False)
     value = Column(Text, nullable=False)
     description = Column(String, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None), onupdate=datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class AdminAnnouncement(Base):
@@ -420,7 +420,7 @@ class AdminAnnouncement(Base):
     content = Column(Text, nullable=False)
     type = Column(String, default="announcement")  # announcement, maintenance, alert
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
     expires_at = Column(DateTime, nullable=True)
 
 
@@ -432,6 +432,6 @@ class BackupHistory(Base):
     filepath = Column(String, nullable=False)
     filesize = Column(String, nullable=False)
     status = Column(String, default="completed")  # completed, failed
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
 
 

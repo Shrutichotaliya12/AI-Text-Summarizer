@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.shared.database import get_db
-from app.shared.models import Summary, Document, ActivityLog, UserSettings
+from app.shared.models import Summary, ActivityLog, UserSettings
 from app.features.authentication.router import get_current_user, User
 
 router = APIRouter()
