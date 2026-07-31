@@ -102,9 +102,9 @@ jobs:
 
       - name: Run pytest suite
         run: |
-          pytest tests/ -v --tb=short
+          python -m pytest tests/ -v --tb=short
         env:
-          PYTHONPATH: .
+          PYTHONPATH: ${{ github.workspace }}/backend
           ENVIRONMENT: testing
           JWT_SECRET: test_jwt_secret_for_ci_only
           DATABASE_URL: sqlite:///./test.db

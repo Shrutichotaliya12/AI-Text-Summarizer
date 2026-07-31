@@ -1,3 +1,4 @@
+import os
 import random
 import secrets
 import smtplib
@@ -315,7 +316,8 @@ def send_real_email(to_email: str, subject: str, html_body: str, text_body: str 
             logger.error(f"Email delivery failed to {to_email}: {e2}")
             
     # AUDIT LOGGING without OTP values
-    with open("backend/logs/email_audit.log", "a") as f:
+    os.makedirs(os.path.dirname("logs/email_audit.log"), exist_ok=True)
+    with open("logs/email_audit.log", "a") as f:
         timestamp = datetime.utcnow().isoformat()
         f.write(f"[{timestamp}] Type: '{subject}' | Recipient: {to_email} | Status: {status}\n")
 

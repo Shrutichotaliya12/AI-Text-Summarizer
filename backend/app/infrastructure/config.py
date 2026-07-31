@@ -61,14 +61,6 @@ class Settings(BaseSettings):
             raise ValueError("JWT_SECRET must be set to a secure value in production!")
         return v
 
-    @field_validator("SMTP_USER")
-    @classmethod
-    def validate_smtp_user(cls, v, info):
-        if v and v != "textsummarizer.ai@gmail.com":
-            print(f"[SECURITY ERROR] Refusing SMTP initialization. Invalid developer email: {v}")
-            raise ValueError("SMTP_USER must be exactly textsummarizer.ai@gmail.com")
-        return v
-
     @property
     def cors_origins(self) -> list[str]:
         if self.ALLOWED_ORIGINS == "*":
