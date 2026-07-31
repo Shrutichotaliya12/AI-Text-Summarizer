@@ -796,95 +796,52 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
           </div>
           
           {/* Footer Redesign */}
-          <footer className="mt-12 bg-slate-900/80 backdrop-blur-md border-t border-slate-800 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.3)] pt-12 pb-6 px-6 sm:px-12 w-full transition-opacity duration-1000 animate-in fade-in select-none">
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between gap-12 md:gap-8 mb-12">
+          <footer className="mt-12 bg-white rounded-t-3xl shadow-[0_-4px_25px_-5px_rgba(0,0,0,0.1)] pt-6 pb-6 px-4 w-full transition-opacity duration-1000 animate-in fade-in select-none font-sans text-center relative z-10">
+            <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-4">
               
-              {/* LEFT */}
-              <div className="flex flex-col gap-3 md:w-1/3">
-                <h3 className="text-white font-display font-semibold text-lg tracking-wide">
-                  AI Text Summarizer <span className="text-main">Pro</span>
-                </h3>
-                <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
-                  AI-powered document summarization and NLP workspace.
-                </p>
-                <p className="text-slate-500 text-xs mt-2 font-mono">
-                  Version: v1.0.0
-                </p>
+              {/* TOP ROW: Status */}
+              <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6 text-sm">
+                {[
+                  { label: "AI Status", status: apiStatus.ai },
+                  { label: "DB Status", status: apiStatus.db },
+                  { label: "Auth", status: apiStatus.auth },
+                  { label: "Email Service", status: apiStatus.email },
+                  { label: "Storage", status: apiStatus.storage }
+                ].map((item, idx) => {
+                  const s = item.status?.toLowerCase() || "offline";
+                  let dotColor = "bg-red-500";
+                  let textColor = "text-red-500";
+                  let text = "Offline";
+                  
+                  if (s === "working" || s === "online" || s === "healthy") {
+                    dotColor = "bg-emerald-500";
+                    textColor = "text-emerald-500";
+                    text = "Working";
+                  } else if (s === "degraded" || s === "limited") {
+                    dotColor = "bg-amber-500";
+                    textColor = "text-amber-500";
+                    text = "Limited";
+                  }
+
+                  return (
+                    <div key={idx} className="flex items-center gap-1.5 transition-transform hover:scale-105 cursor-default">
+                      <span className="font-semibold text-slate-700">{item.label}:</span>
+                      <span className={`h-2.5 w-2.5 rounded-full ${dotColor} ${s === "working" ? "" : "animate-pulse"}`}></span>
+                      <span className={`${textColor} font-semibold`}>{text}</span>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* CENTER */}
-              <div className="flex flex-col gap-4 md:w-1/3 md:items-center">
-                <h4 className="text-slate-300 font-medium text-sm tracking-widest uppercase">System Status</h4>
-                <div className="flex flex-wrap md:justify-center gap-3">
-                  {[
-                    { label: "AI", status: apiStatus.ai },
-                    { label: "Database", status: apiStatus.db },
-                    { label: "Authentication", status: apiStatus.auth },
-                    { label: "Email", status: apiStatus.email },
-                    { label: "Storage", status: apiStatus.storage }
-                  ].map((item, idx) => {
-                    const s = item.status?.toLowerCase() || "offline";
-                    let colorClass = "text-red-400 bg-red-400/10 border-red-400/20";
-                    let dotClass = "bg-red-400";
-                    let text = "Disconnected";
-                    
-                    if (s === "working" || s === "online" || s === "healthy") {
-                      colorClass = "text-emerald-400 bg-emerald-400/10 border-emerald-400/20";
-                      dotClass = "bg-emerald-400";
-                      text = "Working";
-                    } else if (s === "degraded" || s === "limited") {
-                      colorClass = "text-amber-400 bg-amber-400/10 border-amber-400/20";
-                      dotClass = "bg-amber-400";
-                      text = "Limited";
-                    }
-
-                    return (
-                      <div key={idx} className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${colorClass}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${dotClass} ${s === "working" ? "" : "animate-pulse"}`} style={{ boxShadow: `0 0 8px currentColor` }} />
-                        <span className="text-slate-200 mr-1">{item.label}</span>
-                        <span className="opacity-90">{text}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+              {/* MIDDLE ROW: Copyright & Tech Stack */}
+              <div className="text-[13.5px] text-slate-500 font-medium mt-1">
+                &copy; 2026 AI Text Summarizer Pro &bull; Built with <span className="text-rose-500 mx-0.5">❤️</span> using Python - FastAPI - Hugging Face - PyTorch &bull; Version 1.0.0 (Build 240725)
               </div>
 
-              {/* RIGHT */}
-              <div className="flex flex-col gap-3 md:w-1/3 md:items-end text-left md:text-right">
-                <h4 className="text-slate-300 font-medium text-sm tracking-widest uppercase">Designed & Developed by</h4>
-                <p className="text-white font-semibold text-base tracking-wide">
-                  Shruti Chotaliya
-                </p>
-                <p className="text-slate-400 text-sm">
-                  MCA (Artificial Intelligence)
-                </p>
-                <div className="flex items-center gap-4 mt-2">
-                  <a href="#" className="text-slate-400 hover:text-white hover:scale-110 transition-all" aria-label="GitHub">
-                    <Github className="w-5 h-5" />
-                  </a>
-                  <a href="#" className="text-slate-400 hover:text-[#0a66c2] hover:scale-110 transition-all" aria-label="LinkedIn">
-                    <Linkedin className="w-5 h-5" />
-                  </a>
-                  <a href="#" className="text-slate-400 hover:text-main hover:scale-110 transition-all" aria-label="Portfolio">
-                    <Globe className="w-5 h-5" />
-                  </a>
-                </div>
+              {/* BOTTOM ROW: Author */}
+              <div className="text-[13.5px] text-slate-500 font-medium">
+                Designed & Developed by <a href="#" className="text-blue-600 hover:text-blue-700 font-semibold hover:underline transition-all">Shruti Chotaliya</a>
               </div>
-
-            </div>
-
-            {/* BOTTOM BAR */}
-            <div className="max-w-7xl mx-auto pt-6 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-500 font-medium">
-              <p>&copy; 2026 AI Text Summarizer Pro</p>
-              <p className="flex flex-wrap justify-center items-center gap-1.5">
-                Built with 
-                <span className="text-slate-300">React</span> &bull; 
-                <span className="text-slate-300">Vite</span> &bull; 
-                <span className="text-slate-300">FastAPI</span> &bull; 
-                <span className="text-slate-300">Python</span> &bull; 
-                <span className="text-slate-300">Hugging Face</span> &bull; 
-                <span className="text-slate-300">PyTorch</span>
-              </p>
             </div>
           </footer>
         </div>
