@@ -7,7 +7,7 @@ from fastapi import Request
 from app.shared.models import User
 
 # Ensure logs directory exists
-LOGS_DIR = os.path.join(os.getcwd(), "logs")
+LOGS_DIR = os.getenv("LOGS_DIR", "/tmp/logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
 
 def get_audit_logger(name: str, filename: str):

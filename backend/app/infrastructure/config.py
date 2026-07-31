@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = Field(
-        default="postgresql://postgres:postgres_password@localhost:5432/summarizer_db",
+        default="",
         validation_alias="DATABASE_URL"
     )
     
