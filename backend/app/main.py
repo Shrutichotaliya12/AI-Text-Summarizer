@@ -191,7 +191,7 @@ app.include_router(history_router,        prefix="/api/v1/history",       tags=[
 app.include_router(models_router,         prefix="/api/v1/models",        tags=["Models"])
 app.include_router(admin_router,          prefix="/api/v1/admin",         tags=["Admin"])
 app.include_router(notifications_router,  prefix="/api/v1/notifications", tags=["Notifications"])
-app.include_router(system_router,         prefix="/api/system",           tags=["System Status"])
+app.include_router(system_router,         prefix="/api/v1/system",        tags=["System Status"])
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ─── Health / Readiness / Liveness Endpoints ─────────────────────────────────
