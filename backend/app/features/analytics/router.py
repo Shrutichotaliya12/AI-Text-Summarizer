@@ -131,8 +131,17 @@ def get_performance_stats(
     if is_admin_flag:
         docs_today = db.query(Document).filter(Document.last_modified >= cutoff_24h, Document.deleted_at == None).count()
         sums_today = db.query(Summary).filter(Summary.created_at >= cutoff_24h).count()
+        total_chats = 0
+        active_convos = 0
+        total_msgs = 0
+        avg_convo_len = 0
+    else:
         docs_today = db.query(Document).filter(Document.user_id == current_user.id, Document.last_modified >= cutoff_24h, Document.deleted_at == None).count()
         sums_today = db.query(Summary).filter(Summary.user_id == current_user.id, Summary.created_at >= cutoff_24h).count()
+        total_chats = 0
+        active_convos = 0
+        total_msgs = 0
+        avg_convo_len = 0
 
     # Words & sizes calculations
     sum_words_count = 0
