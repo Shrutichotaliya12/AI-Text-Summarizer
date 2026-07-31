@@ -76,7 +76,29 @@ jobs:
           pip install -r requirements.txt
 
       - name: Syntax / import validation
-        run: python -c "import ast, os; [ast.parse(open(os.path.join(r, f), encoding='utf-8').read()) for r,d,files in os.walk('app') for f in files if f.endswith('.py')]"
+        run: |
+          python -c "
+          import ast, os, sys
+          errors = 0
+          target_dirs = [r for r, d, files in os.walk('.') if 'main.py' in files and 'venv' not in r]
+          if not target_dirs:
+              print('Error: Could not automatically detect backend location containing main.py')
+              sys.exit(1)
+          for target_dir in target_dirs:
+              for r, d, files in os.walk(target_dir):
+                  for f in files:
+                      if f.endswith('.py'):
+                          path = os.path.join(r, f)
+                          try:
+                              with open(path, encoding='utf-8') as file:
+                                  ast.parse(file.read(), filename=path)
+                          except Exception as e:
+                              print(f'Syntax error in {path}: {e}')
+                              errors += 1
+          if errors:
+              sys.exit(1)
+          print('Syntax validation passed successfully.')
+          "
 
       - name: Run pytest suite
         run: |
