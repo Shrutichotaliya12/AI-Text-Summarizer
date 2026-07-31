@@ -47,8 +47,8 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version="1.0.0",
     description="Production-ready API for document understanding, text summarization, and NLP analysis (Feature-Based Architecture).",
-    docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
-    redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 # GZip Compression — compresses responses > 1000 bytes
@@ -192,6 +192,15 @@ app.include_router(models_router,         prefix="/api/v1/models",        tags=[
 app.include_router(admin_router,          prefix="/api/v1/admin",         tags=["Admin"])
 app.include_router(notifications_router,  prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(system_router,         prefix="/api/v1/system",        tags=["System Status"])
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─── Root Endpoint ─────────────────────────────────────────────────────────────
+@app.get("/", tags=["System Status"])
+def root():
+    return {
+        "status": "success",
+        "message": "AI Text Summarizer Backend is Running"
+    }
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ─── Health / Readiness / Liveness Endpoints ─────────────────────────────────
