@@ -28,6 +28,16 @@ from app.features.document_analysis.router import router as analysis_router
 from app.features.rouge.router import router as rouge_router
 from app.features.system.router import router as system_router
 
+# Import models and create tables
+from app.shared.database import Base, engine
+from app.shared import models
+
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    logger.error(f"DB auto-initialization exception: {e}")
+
+
 # ─── In-memory sliding window rate limiter ───────────────────────────────────
 # Stores: { ip: [timestamp, ...] }
 _rate_store: dict[str, list[float]] = defaultdict(list)

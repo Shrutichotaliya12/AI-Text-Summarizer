@@ -361,9 +361,9 @@ export const AiTools: React.FC = () => {
                     return <h4 key={i} className="text-xs font-bold font-display text-primary mt-2 mb-1.5">{line.substring(4)}</h4>;
                   }
                   if (line.startsWith("- ")) {
-                    return <div key={i} className="pl-3 mb-1 text-slate-600 dark:text-slate-300">&bull; {line.substring(2)}</div>;
+                    return <div key={i} className="pl-3 mb-1 text-muted dark:text-slate-300">&bull; {line.substring(2)}</div>;
                   }
-                  return <p key={i} className="mb-2 text-slate-700 dark:text-slate-200">{line}</p>;
+                  return <p key={i} className="mb-2 text-main">{line}</p>;
                 })}
               </div>
             ) : (

@@ -157,7 +157,7 @@ export const NotificationCenter: React.FC = () => {
       case 'high': return <AlertCircle className="w-5 h-5 text-orange-500" />;
       case 'medium': return <Info className="w-5 h-5 text-blue-500" />;
       case 'low': return <CheckCircle2 className="w-5 h-5 text-green-500" />;
-      default: return <Info className="w-5 h-5 text-gray-500" />;
+      default: return <Info className="w-5 h-5 text-muted" />;
     }
   };
 
@@ -168,7 +168,7 @@ export const NotificationCenter: React.FC = () => {
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600 mb-2">
             Notification Center
           </h1>
-          <p className="text-gray-500 dark:text-gray-400">View your alerts, recent activities, and communication settings.</p>
+          <p className="text-muted">View your alerts, recent activities, and communication settings.</p>
         </div>
       </div>
 
@@ -176,7 +176,7 @@ export const NotificationCenter: React.FC = () => {
         <button
           onClick={() => setActiveTab('notifications')}
           className={`pb-2 px-1 text-sm font-medium flex items-center space-x-2 transition-colors border-b-2 ${
-            activeTab === 'notifications' ? 'border-indigo-500 text-indigo-600 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            activeTab === 'notifications' ? 'border-indigo-500 text-indigo-600 dark:text-white' : 'border-transparent text-muted hover:text-main dark:hover:text-white'
           }`}
         >
           <Bell className="w-4 h-4" />
@@ -185,7 +185,7 @@ export const NotificationCenter: React.FC = () => {
         <button
           onClick={() => setActiveTab('activity')}
           className={`pb-2 px-1 text-sm font-medium flex items-center space-x-2 transition-colors border-b-2 ${
-            activeTab === 'activity' ? 'border-indigo-500 text-indigo-600 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            activeTab === 'activity' ? 'border-indigo-500 text-indigo-600 dark:text-white' : 'border-transparent text-muted hover:text-main dark:hover:text-white'
           }`}
         >
           <Activity className="w-4 h-4" />
@@ -194,7 +194,7 @@ export const NotificationCenter: React.FC = () => {
         <button
           onClick={() => setActiveTab('preferences')}
           className={`pb-2 px-1 text-sm font-medium flex items-center space-x-2 transition-colors border-b-2 ${
-            activeTab === 'preferences' ? 'border-indigo-500 text-indigo-600 dark:text-white' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            activeTab === 'preferences' ? 'border-indigo-500 text-indigo-600 dark:text-white' : 'border-transparent text-muted hover:text-main dark:hover:text-white'
           }`}
         >
           <Settings className="w-4 h-4" />
@@ -206,13 +206,13 @@ export const NotificationCenter: React.FC = () => {
         {activeTab !== 'preferences' && (
           <div className="flex justify-between items-center mb-6">
             <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-muted w-4 h-4" />
               <input
                 type="text"
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg pl-9 pr-4 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg pl-9 pr-4 py-2 text-sm text-main dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               />
             </div>
             {activeTab === 'notifications' && (
@@ -220,7 +220,7 @@ export const NotificationCenter: React.FC = () => {
                 <select 
                   value={filter} 
                   onChange={(e) => setFilter(e.target.value)}
-                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                  className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-main dark:text-white focus:outline-none focus:border-indigo-500"
                 >
                   <option value="newest">Newest First</option>
                   <option value="oldest">Oldest First</option>
@@ -247,18 +247,18 @@ export const NotificationCenter: React.FC = () => {
             {activeTab === 'notifications' && (
               <div className="space-y-4">
                 {notifications.length === 0 ? (
-                  <div className="text-center text-gray-500 dark:text-gray-400 py-12">No notifications found.</div>
+                  <div className="text-center text-muted py-12">No notifications found.</div>
                 ) : (
                   notifications.map(notif => (
                     <div key={notif.id} className={`flex items-start justify-between p-4 rounded-lg border ${notif.is_read ? 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-800' : 'bg-white dark:bg-gray-800 border-indigo-200 dark:border-indigo-500/30'} transition-all`}>
                       <div className="flex items-start space-x-4">
                         <div className="mt-1">{getPriorityIcon(notif.priority)}</div>
                         <div>
-                          <h4 className={`text-sm font-medium ${notif.is_read ? 'text-gray-600 dark:text-gray-300' : 'text-gray-900 dark:text-white'}`}>
+                          <h4 className={`text-sm font-medium ${notif.is_read ? 'text-muted dark:text-gray-300' : 'text-main dark:text-white'}`}>
                             {notif.title || notif.event_type}
                           </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{notif.text}</p>
-                          <span className="text-xs text-gray-400 dark:text-gray-500 mt-2 block">
+                          <p className="text-sm text-muted mt-1">{notif.text}</p>
+                          <span className="text-xs text-gray-400 dark:text-muted mt-2 block">
                             {new Date(notif.created_at).toLocaleString()}
                           </span>
                         </div>
@@ -285,7 +285,7 @@ export const NotificationCenter: React.FC = () => {
             {activeTab === 'activity' && (
               <div className="relative pl-6 border-l-2 border-gray-200 dark:border-gray-800 space-y-8">
                 {activities.length === 0 ? (
-                  <div className="text-center text-gray-500 dark:text-gray-400 py-12">No activities recorded.</div>
+                  <div className="text-center text-muted py-12">No activities recorded.</div>
                 ) : (
                   activities.map(log => (
                     <div key={log.id} className="relative">
@@ -293,12 +293,12 @@ export const NotificationCenter: React.FC = () => {
                         {log.action.includes('LOGIN') ? <Shield className="w-4 h-4 text-green-500 dark:text-green-400" /> : <UploadCloud className="w-4 h-4 text-blue-500 dark:text-blue-400" />}
                       </span>
                       <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-200">{log.action.replace(/_/g, ' ')}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{log.details}</p>
+                        <h4 className="text-sm font-medium text-main">{log.action.replace(/_/g, ' ')}</h4>
+                        <p className="text-sm text-muted mt-1">{log.details}</p>
                         <div className="flex space-x-4 mt-2">
-                          <span className="text-xs text-gray-500 flex items-center"><Watch className="w-3 h-3 mr-1" /> {new Date(log.timestamp).toLocaleString()}</span>
-                          {log.device && <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">{log.device}</span>}
-                          {log.browser && <span className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">{log.browser}</span>}
+                          <span className="text-xs text-muted flex items-center"><Watch className="w-3 h-3 mr-1" /> {new Date(log.timestamp).toLocaleString()}</span>
+                          {log.device && <span className="text-xs text-muted bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">{log.device}</span>}
+                          {log.browser && <span className="text-xs text-muted bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">{log.browser}</span>}
                         </div>
                       </div>
                     </div>
@@ -310,12 +310,12 @@ export const NotificationCenter: React.FC = () => {
             {activeTab === 'preferences' && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Notification Preferences</h3>
+                  <h3 className="text-lg font-medium text-main dark:text-white mb-4">Notification Preferences</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                       <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">Email Notifications</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Receive alerts via email</p>
+                        <h4 className="text-sm font-medium text-main dark:text-white">Email Notifications</h4>
+                        <p className="text-xs text-muted mt-1">Receive alerts via email</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" checked={preferences.email_notifications ?? true} onChange={(e) => updatePreference('email_notifications', e.target.checked)} className="sr-only peer" />
@@ -325,8 +325,8 @@ export const NotificationCenter: React.FC = () => {
 
                     <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                       <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">Toast Alerts</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Show on-screen popups</p>
+                        <h4 className="text-sm font-medium text-main dark:text-white">Toast Alerts</h4>
+                        <p className="text-xs text-muted mt-1">Show on-screen popups</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" checked={preferences.toast_alerts ?? true} onChange={(e) => updatePreference('toast_alerts', e.target.checked)} className="sr-only peer" />
@@ -336,8 +336,8 @@ export const NotificationCenter: React.FC = () => {
 
                     <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                       <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">Sound Alerts</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Play sound for new notifications</p>
+                        <h4 className="text-sm font-medium text-main dark:text-white">Sound Alerts</h4>
+                        <p className="text-xs text-muted mt-1">Play sound for new notifications</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" checked={preferences.sound_alerts ?? true} onChange={(e) => updatePreference('sound_alerts', e.target.checked)} className="sr-only peer" />
@@ -347,8 +347,8 @@ export const NotificationCenter: React.FC = () => {
 
                     <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                       <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">Desktop Notifications</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Show OS level notifications</p>
+                        <h4 className="text-sm font-medium text-main dark:text-white">Desktop Notifications</h4>
+                        <p className="text-xs text-muted mt-1">Show OS level notifications</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" checked={preferences.desktop_notifications ?? false} onChange={(e) => updatePreference('desktop_notifications', e.target.checked)} className="sr-only peer" />

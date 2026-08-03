@@ -13,49 +13,37 @@ import {
   TrendingUp,
   SmilePlus,
   Compass,
-  List
+  List,
+  ChevronDown,
+  ChevronUp,
+  ArrowRight,
+  MessageSquare,
+  HelpCircle,
+  Send,
+  X,
+  Loader2,
+  CheckCircle2,
+  Clock,
+  Mic,
+  Globe,
+  FileBadge,
+  Download,
+  Check
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { AIResponseRenderer } from "@/components/ui/AIResponseRenderer";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useModelStore } from "@/state";
 import { useToast } from "@/context/ToastContext";
 import { apiClient } from "@/api";
 
-// Helper function to extract 3 dynamic key takeaways from text based on semantic cues
-const extractTakeaways = (text: string): string[] => {
-  if (!text) return [];
-  // Split into sentences
-  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 25 && s.length < 160);
-  
-  const keywords = ["should", "must", "important", "key", "recommend", "need to", "significant", "conclude", "primary", "focus", "essential", "aim", "development"];
-  const matches: string[] = [];
-  
-  for (const sentence of sentences) {
-    if (keywords.some(kw => sentence.toLowerCase().includes(kw))) {
-      // Avoid duplicate or very similar sentences
-      if (!matches.some(m => m.toLowerCase().slice(0, 15) === sentence.toLowerCase().slice(0, 15))) {
-        matches.push(sentence);
-      }
-    }
-    if (matches.length >= 3) break;
-  }
-  
-  // Fallback to first 3 sentences if not enough matches
-  if (matches.length < 3) {
-    const remaining = 3 - matches.length;
-    const fallbacks = sentences.filter(s => !matches.includes(s)).slice(0, remaining);
-    matches.push(...fallbacks);
-  }
-  
-  return matches.map(s => s.endsWith(".") ? s : s + ".");
-};
-
 interface KeywordItem {
   keyword: string;
   frequency: number;
   tfIdfScore: number;
   importanceScore: number;
+  pages?: number[];
 }
 
 interface AnalysisData {
@@ -84,6 +72,14 @@ interface AnalysisData {
     numberCount: number;
     uppercaseCount: number;
     lowercaseCount: number;
+    ocrRequired?: boolean;
+    extractionSuccessful?: boolean;
+    pagesProcessed?: number;
+    documentType?: string;
+    overview?: string;
+    structure?: {section: string, level: string, start_page: number, end_page: number, description: string}[];
+    takeaways?: {text: string, page: number}[];
+    facts?: {type: string, value: string, context: string, page: number}[];
   };
   readability_scores: {
     fleschReadingEase: number;
@@ -98,45 +94,16 @@ interface AnalysisData {
   language_analysis: {
     language: string;
     confidenceScore: number;
-    writingStyle: string;
-    tone: string;
   };
   keywords: KeywordItem[];
-  ner_results: {
-    Person: string[];
-    Organization: string[];
-    Location: string[];
-    Date: string[];
-    Time: string[];
-    Money: string[];
-    Email: string[];
-    "Phone Number": string[];
-    Website: string[];
-    Product: string[];
-    Technology: string[];
-  };
-  pos_distribution: {
-    Nouns: number;
-    Verbs: number;
-    Adjectives: number;
-    Adverbs: number;
-    Pronouns: number;
-    Prepositions: number;
-    Conjunctions: number;
-  };
+  ner_results: Record<string, {entity: string, count: number, pages: number[]}[]>;
+  pos_distribution: Record<string, number>;
   sentiment_emotion: {
     sentiment: string;
-    confidence: number;
-    positive: number;
-    negative: number;
-    neutral: number;
-    emotions: {
-      happy: number;
-      sad: number;
-      angry: number;
-      fear: number;
-      surprise: number;
-    };
+    tone: string;
+    writingStyle: string;
+    complexity?: string;
+    objectivity?: string;
   };
   topics: {
     mainTopic: string;
@@ -145,6 +112,7 @@ interface AnalysisData {
       distribution: number;
       importance: string;
       subtopics: string[];
+      count?: number;
     }[];
   };
   summarization_analysis?: {
@@ -157,6 +125,23 @@ interface AnalysisData {
   };
 }
 
+const SkeletonLoader = () => (
+  <div className="flex flex-col gap-6 animate-pulse">
+    <div className="flex justify-between items-center mb-2">
+      <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-64"></div>
+      <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-48"></div>
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="h-48 bg-slate-200 dark:bg-slate-800 rounded-xl lg:col-span-5"></div>
+      <div className="h-48 bg-slate-200 dark:bg-slate-800 rounded-xl lg:col-span-7"></div>
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="h-80 bg-slate-200 dark:bg-slate-800 rounded-xl lg:col-span-1"></div>
+      <div className="h-80 bg-slate-200 dark:bg-slate-800 rounded-xl lg:col-span-2"></div>
+    </div>
+  </div>
+);
+
 export const DocumentAnalysis: React.FC = () => {
   const { currentDocument, setCurrentDocument } = useModelStore();
   const { success, error: toastError } = useToast();
@@ -166,26 +151,170 @@ export const DocumentAnalysis: React.FC = () => {
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [documents, setDocuments] = useState<any[]>([]);
-  const [takeaways, setTakeaways] = useState<string[]>([]);
+  
+  const [showFullOverview, setShowFullOverview] = useState(false);
 
-  const fetchDocuments = async () => {
+  const [viewerPage, setViewerPage] = useState<number | null>(null);
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  
+  const [qaQuery, setQaQuery] = useState("");
+  const [qaLoading, setQaLoading] = useState(false);
+  const [qaHistory, setQaHistory] = useState<{q: string, a: string, sources: number[]}[]>([]);
+  
+  const [searchResults, setSearchResults] = useState<{page: number, text: string, score: number}[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [activeTab, setActiveTab] = useState("Overview");
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const stats = analysis?.text_statistics || {};
+  const tone = analysis?.sentiment_emotion || {};
+  const entities = analysis?.ner_results || {};
+  const displayOverview = analysis?.text_statistics?.overview;
+  const isOverviewLong = displayOverview && displayOverview.length > 300;
+  
+  const conceptsCategories = analysis?.keywords.slice(0, 8).map(k => k.keyword) || [];
+  const conceptsSeries = [{ data: analysis?.keywords.slice(0, 8).map(k => k.frequency) || [] }];
+  
+  const topicsSeriesLabels = analysis?.topics.distribution.map(d => d.topic) || [];
+  const topicsSeries = analysis?.topics.distribution.map(d => d.distribution) || [];
+
+  const posLabels = Object.keys(analysis?.pos_distribution || {});
+  const posSeries = Object.values(analysis?.pos_distribution || {});
+
+  const conceptsChartOptions: ApexOptions = {
+    chart: { 
+      type: 'bar', 
+      toolbar: { show: false }, 
+      background: 'transparent',
+      animations: { enabled: true, easing: 'easeinout', speed: 800 }
+    },
+    theme: { mode: 'light' },
+    plotOptions: {
+      bar: { horizontal: true, borderRadius: 4, dataLabels: { position: 'top' } }
+    },
+    dataLabels: { enabled: true, offsetX: 20, style: { fontSize: '10px', colors: ['inherit'] }, formatter: (val) => val.toString() },
+    xaxis: { categories: conceptsCategories, labels: { style: { colors: 'inherit' } }, axisBorder: { show: false }, axisTicks: { show: false } },
+    yaxis: { labels: { style: { colors: 'inherit', fontWeight: 'bold' } } },
+    grid: { borderColor: 'rgba(0,0,0,0.05)', strokeDashArray: 4, xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } } },
+    colors: ['#6366f1'],
+    tooltip: { theme: 'light' }
+  };
+
+  const topicsChartOptions: ApexOptions = {
+    chart: { 
+      type: 'donut', 
+      background: 'transparent',
+      animations: { enabled: true, easing: 'easeinout', speed: 800 }
+    },
+    theme: { mode: 'light' },
+    labels: topicsSeriesLabels,
+    legend: { position: 'bottom', labels: { colors: 'inherit' } },
+    stroke: { width: 0 },
+    dataLabels: { enabled: true, formatter: function(val) { return Math.round(val) + "%"; } },
+    tooltip: { theme: 'light' }
+  };
+
+  const renderHighlighted = (text: string) => {
+    if (!searchQuery.trim()) return text;
+    const regex = new RegExp(`(${searchQuery})`, 'gi');
+    const parts = text.split(regex);
+    return parts.map((part, i) => 
+      part.toLowerCase() === searchQuery.toLowerCase() ? <span key={i} className="bg-yellow-200 dark:bg-yellow-800">{part}</span> : part
+    );
+  };
+
+  const handleExport = async (fmt: string) => {
+    if (!currentDocument) return;
+    setExportLoading(true);
     try {
-      const res = await apiClient.get('/upload/?page_size=100&sort_by=upload_time&sort_order=desc');
-      if (res.data.documents) {
-        setDocuments(res.data.documents);
-      }
+      const res = await apiClient.get(`/analysis/${currentDocument.id}/export?format=${fmt}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Analysis_Report_${currentDocument.name}.${fmt === 'excel' ? 'xlsx' : fmt}`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setExportDropdownOpen(false);
+      success(`Report exported as ${fmt.toUpperCase()}`);
     } catch (e) {
-      console.error("Failed to fetch documents list", e);
+      toastError("Export failed");
+    } finally {
+      setExportLoading(false);
     }
   };
 
+  const handleViewSource = async (page: number) => {
+    if (!currentDocument) return;
+    setViewerPage(page);
+    if (!viewerUrl) {
+      try {
+        const res = await apiClient.get(`/upload/document/${currentDocument.id}/raw`, { responseType: 'blob' });
+        let url;
+        if (currentDocument.type === 'pdf') {
+          url = URL.createObjectURL(res.data);
+        } else {
+          // For non-pdfs, load as text/plain so browser handles it gracefully in iframe
+          url = URL.createObjectURL(new Blob([res.data], { type: 'text/plain' }));
+        }
+        setViewerUrl(url);
+      } catch (e) {
+        toastError("Failed to load document viewer");
+      }
+    }
+  };
+
+  const handleAsk = async () => {
+    if (!qaQuery.trim() || !currentDocument) return;
+    setQaLoading(true);
+    try {
+      const res = await apiClient.post(`/analysis/${currentDocument.id}/ask`, { question: qaQuery });
+      setQaHistory(prev => [{q: qaQuery, a: res.data.answer, sources: res.data.sources}, ...prev]);
+      setQaQuery("");
+    } catch (e) {
+      toastError("Failed to get answer");
+    } finally {
+      setQaLoading(false);
+    }
+  };
+
+
+  const fetchDocuments = async () => {
+    try {
+      const res = await apiClient.get('/upload/');
+      const docs = res.data.documents || [];
+      setDocuments(docs);
+      
+      if (!currentDocument) {
+        const savedDocId = localStorage.getItem('lastAnalysisDocId');
+        if (savedDocId) {
+          const savedDoc = docs.find((d: any) => d.id === savedDocId);
+          if (savedDoc) {
+            setCurrentDocument(savedDoc);
+            return;
+          }
+        }
+        if (docs.length > 0) {
+          setCurrentDocument(docs[0]);
+          localStorage.setItem('lastAnalysisDocId', docs[0].id);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
   const fetchAnalysis = async (forceRefresh = false) => {
     if (!currentDocument) return;
-    if (forceRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    
+    setLoading(true);
+    if (forceRefresh) setRefreshing(true);
 
     try {
       if (forceRefresh) {
@@ -193,595 +322,545 @@ export const DocumentAnalysis: React.FC = () => {
       }
       const response = await apiClient.get(`/analysis/${currentDocument.id}`);
       setAnalysis(response.data);
-      
-      // Fetch full document details to get text for takeaways extraction
-      const docDetails = await apiClient.get(`/upload/document/${currentDocument.id}`);
-      if (docDetails.data && docDetails.data.text) {
-        setTakeaways(extractTakeaways(docDetails.data.text));
-      } else {
-        setTakeaways([]);
-      }
-
+    } catch (err: any) {
       if (forceRefresh) {
-        success("NLP Analysis successfully refreshed!");
+        toastError("Failed to refresh analysis.");
       }
-    } catch (error) {
-      console.error("Failed to load document analysis:", error);
-      toastError("Failed to fetch document analysis.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Load document list once on mount
   useEffect(() => {
-    fetchDocuments();
-  }, []);
-
-  // Sync analysis whenever document changes, or fetch latest document if none selected
-  useEffect(() => {
-    const initializeDocument = async () => {
-      if (currentDocument?.id) {
-        fetchAnalysis();
-      } else {
-        // Fetch the latest document globally
-        setLoading(true);
-        try {
-          const res = await apiClient.get('/upload/?page_size=1&sort_by=upload_time&sort_order=desc');
-          if (res.data.documents && res.data.documents.length > 0) {
-            setCurrentDocument(res.data.documents[0]);
-          }
-        } catch (e) {
-          console.error("Failed to load latest document fallback", e);
-        } finally {
-          setLoading(false);
-        }
-        setAnalysis(null);
-      }
-    };
-    initializeDocument();
+    if (currentDocument?.id) {
+      setAnalysis(null);
+      setViewerPage(null);
+      setViewerUrl(null);
+      setQaHistory([]);
+      setQaQuery("");
+      setSearchQuery("");
+      fetchAnalysis();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDocument?.id]);
 
-  const handleExport = (format: string) => {
-    if (!currentDocument) return;
-    window.open(`${apiClient.defaults.baseURL}/analysis/${currentDocument.id}/export?format=${format}`, "_blank");
-    success(`Downloading report in ${format.toUpperCase()} format.`);
-  };
-
-  // Helper to highlight matching queries in text statistics or keywords
-  const renderHighlighted = (val: string | number) => {
-    const textStr = String(val);
-    if (!searchQuery.trim()) return textStr;
-    const parts = textStr.split(new RegExp(`(${searchQuery.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")})`, "gi"));
-    return (
-      <>
-        {parts.map((p, idx) => 
-          p.toLowerCase() === searchQuery.toLowerCase() 
-            ? <mark key={idx} className="bg-yellow-200 text-black px-0.5 rounded font-bold">{p}</mark> 
-            : p
-        )}
-      </>
-    );
-  };
-
-  if (!currentDocument) {
-    return (
-      <div className="flex flex-col gap-6 items-center justify-center min-h-[60vh] select-none text-center">
-        <Card className="p-8 max-w-md border border-borderToken bg-surface shadow-md flex flex-col items-center gap-4">
-          <div className="bg-primary/10 text-primary p-4 rounded-full animate-bounce">
-            <BarChart3 className="w-8 h-8" />
-          </div>
-          <h2 className="text-lg font-bold font-display text-main">No Active Document</h2>
-          <p className="text-xs text-muted leading-relaxed">
-            There is currently no active document. Please load or upload a document inside the <strong>Document Library</strong> section to perform dynamic NLP intelligence reports.
-          </p>
-        </Card>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="w-10 h-10 text-primary animate-spin" />
-          <p className="text-xs font-bold text-muted animate-pulse">Running advanced tokenizers and lexicons...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!analysis) {
-    return (
-      <div className="flex flex-col gap-6 items-center justify-center min-h-[60vh] text-center">
-        <Card className="p-8 max-w-md border border-borderToken bg-surface shadow-md flex flex-col items-center gap-4">
-          <ShieldAlert className="w-8 h-8 text-danger" />
-          <h2 className="text-lg font-bold font-display text-main">Analysis Failed</h2>
-          <p className="text-xs text-muted">Failed to generate NLP statistics for this document.</p>
-          <Button onClick={() => fetchAnalysis()} size="sm">Retry Analysis</Button>
-        </Card>
-      </div>
-    );
-  }
-
-  // 1. Keyword Frequency Chart (dynamic)
-  const keywordChartOptions: ApexOptions = {
-    chart: { id: "keyword-bars", toolbar: { show: false }, fontFamily: "Poppins, Inter, sans-serif" },
-    colors: ["#5b6bff"],
-    plotOptions: {
-      bar: {
-        horizontal: true,
-        barHeight: "65%",
-        borderRadius: 4
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (searchQuery.trim().length > 2 && currentDocument) {
+        setSearchLoading(true);
+        setShowSearchDropdown(true);
+        try {
+          const res = await apiClient.get(`/analysis/${currentDocument.id}/search?q=${encodeURIComponent(searchQuery)}`);
+          setSearchResults(res.data.results);
+        } catch (e) {
+          setSearchResults([]);
+        } finally {
+          setSearchLoading(false);
+        }
+      } else {
+        setSearchResults(null);
+        setShowSearchDropdown(false);
       }
-    },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: analysis.keywords.slice(0, 10).map(k => k.keyword),
-      labels: { style: { colors: "var(--muted)" } }
-    },
-    yaxis: { labels: { style: { colors: "var(--muted)" } } },
-    tooltip: { theme: "dark" }
-  };
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, currentDocument]);
 
-  const keywordChartSeries = [
-    { name: "Mentions Count", data: analysis.keywords.slice(0, 10).map(k => k.frequency) }
-  ];
-
-  // 2. POS Distribution Chart (dynamic)
-  const posChartOptions: ApexOptions = {
-    chart: { id: "pos-donut", fontFamily: "Poppins, Inter, sans-serif" },
-    colors: ["#5b6bff", "#10b981", "#ff4560", "#feb019", "#00e396", "#775dd0", "#546e7a"],
-    labels: Object.keys(analysis.pos_distribution),
-    stroke: { show: false },
-    legend: { position: "bottom", labels: { colors: "var(--muted)" } },
-    tooltip: { theme: "dark" }
-  };
-
-  const posChartSeries = Object.values(analysis.pos_distribution);
-
-  // 3. Sentiment Pie Chart
-  const sentimentChartOptions: ApexOptions = {
-    chart: { id: "sentiment-pie", fontFamily: "Poppins, Inter, sans-serif" },
-    colors: ["#10b981", "#ff4560", "#feb019"],
-    labels: ["Positive", "Negative", "Neutral"],
-    stroke: { show: false },
-    legend: { position: "bottom", labels: { colors: "var(--muted)" } },
-    tooltip: { theme: "dark" }
-  };
-
-  const sentimentChartSeries = [
-    analysis.sentiment_emotion.positive,
-    analysis.sentiment_emotion.negative,
-    analysis.sentiment_emotion.neutral
-  ];
-
-  // 4. Topic Distribution Horizontal Bars
-  const topicChartOptions: ApexOptions = {
-    chart: { id: "topic-bars", toolbar: { show: false }, fontFamily: "Poppins, Inter, sans-serif" },
-    colors: ["#10b981"],
-    plotOptions: {
-      bar: {
-        horizontal: true,
-        barHeight: "55%",
-        borderRadius: 4
-      }
-    },
-    dataLabels: { enabled: false },
-    xaxis: {
-      categories: analysis.topics.distribution.map(t => t.topic),
-      labels: { style: { colors: "var(--muted)" } }
-    },
-    yaxis: { labels: { style: { colors: "var(--muted)" } } },
-    tooltip: { theme: "dark" }
-  };
-
-  const topicChartSeries = [
-    { name: "Relevance Score", data: analysis.topics.distribution.map(t => t.distribution) }
-  ];
-
-  // 5. Word Cloud mapping classes
-  const wordCloudTags = analysis.keywords.slice(0, 15).map((item, idx) => {
-    const classes = [
-      "text-2xl font-black text-primary animate-pulse",
-      "text-2xl font-extrabold text-indigo-500",
-      "text-xl font-bold text-emerald-500",
-      "text-xl font-bold text-amber-500",
-      "text-lg font-semibold text-pink-500",
-      "text-lg font-semibold text-violet-500",
-      "text-base font-medium text-cyan-500",
-      "text-base font-medium text-main",
-      "text-sm font-medium text-muted",
-      "text-xs font-medium text-muted/75"
-    ];
-    return {
-      text: item.keyword.toUpperCase(),
-      weight: classes[idx % classes.length] || "text-xs text-muted"
-    };
-  });
+  if (loading && !analysis) return <SkeletonLoader />;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 min-h-screen">
       
-      {/* Page Title & Search exports bar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <h2 className="text-xl font-bold font-display text-main">Document Intelligence Analysis</h2>
-            {refreshing && <RefreshCw className="w-4 h-4 text-primary animate-spin" />}
+      <div className="flex flex-col gap-4 bg-background/95 pt-4 px-6 md:px-8 -mx-6 md:-mx-8 border-b border-borderToken shadow-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center w-full gap-4">
+          <div className="flex flex-col gap-1.5">
+            <h1 className="text-[22px] font-bold font-display text-main tracking-tight">Document Analysis</h1>
             
-            {/* Dropdown document selector */}
-            {documents.length > 0 && (
-              <select
-                value={currentDocument?.id || ""}
-                onChange={(e) => {
-                  const selected = documents.find(d => d.id === e.target.value);
-                  if (selected) {
-                    setCurrentDocument(selected);
-                  }
-                }}
-                className="bg-slate-100 dark:bg-slate-800/40 border border-borderToken rounded-lg px-3 py-1 text-xs text-main font-semibold outline-none focus:ring-1 focus:ring-primary cursor-pointer max-w-[200px] truncate"
-              >
-                {documents.map((doc) => (
-                  <option key={doc.id} value={doc.id} className="bg-surface text-main">
-                    {doc.display_name || doc.name}
-                  </option>
-                ))}
-              </select>
+            {documents.length > 0 && currentDocument && (
+              <div className="flex items-center gap-3 text-xs text-muted flex-wrap">
+                <select
+                  value={currentDocument?.id || ""}
+                  onChange={(e) => {
+                    const selected = documents.find(d => d.id === e.target.value);
+                    if (selected) {
+                      setCurrentDocument(selected);
+                      localStorage.setItem('lastAnalysisDocId', selected.id);
+                    }
+                  }}
+                  className="bg-transparent border-none font-bold text-main outline-none cursor-pointer appearance-none pr-4 relative text-sm truncate max-w-[200px]"
+                  style={{ background: 'url("data:image/svg+xml;utf8,<svg fill=\'currentColor\' height=\'24\' viewBox=\'0 0 24 24\' width=\'24\' xmlns=\'http://www.w3.org/2000/svg\'><path d=\'M7 10l5 5 5-5z\'/></svg>") no-repeat right', backgroundSize: '16px' }}
+                >
+                  {documents.map((doc) => (
+                    <option key={doc.id} value={doc.id} className="bg-surface text-main">
+                      {doc.display_name || doc.name}
+                    </option>
+                  ))}
+                </select>
+                <Badge variant="primary" className="text-[9px] bg-primary/10 text-primary border-primary/20 tracking-wider">PDF</Badge>
+                <span>Uploaded on {new Date(currentDocument.upload_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric'})}</span>
+                <span>•</span>
+                <span>{analysis?.page_count || 0} Pages</span>
+                <span>•</span>
+                <span>{currentDocument.file_size || '0 MB'}</span>
+              </div>
             )}
           </div>
-          <p className="text-xs text-muted">
-            Advanced NLP linguistics, named entity recognition index, and tokenization distributions metrics.
-          </p>
-        </div>
 
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <div className="relative flex-1 md:flex-initial md:w-64">
-            <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted" />
-            <input
-              type="text"
-              placeholder="Search analysis metrics..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface border border-borderToken rounded-lg pl-8 pr-3 py-1.5 text-xs text-main focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => fetchAnalysis(true)}
-            className="text-xs border-borderToken h-8 gap-1.5"
-            disabled={refreshing}
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Refresh
-          </Button>
-
-          {/* Export options */}
-          <div className="flex bg-slate-100 dark:bg-slate-800/40 p-0.5 rounded-lg border border-borderToken">
-            {["pdf", "csv", "excel", "json", "txt"].map(fmt => (
-              <button
-                key={fmt}
-                onClick={() => handleExport(fmt)}
-                className="px-2.5 py-1 rounded-md text-[10px] font-bold text-muted hover:text-main hover:bg-surface/50 transition-all uppercase"
-              >
-                {fmt === "excel" ? "xls" : fmt}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Overview & Core Diagnostics Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Document Overview & Readability Audience */}
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken lg:col-span-1">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-primary" />
-              <h3 className="font-bold text-xs font-display text-main">Document Details</h3>
-            </div>
-            <Badge variant="primary" className="text-[8px]">ACTIVE</Badge>
-          </div>
-          <div className="flex flex-col gap-2.5 text-xs leading-relaxed">
-            {[
-              { label: "Document Name", value: analysis.document_name },
-              { label: "File Type", value: analysis.file_type.toUpperCase() },
-              { label: "Upload Date", value: new Date(analysis.upload_date).toLocaleDateString() },
-              { label: "File Size", value: analysis.file_size },
-              { label: "Detected Language", value: analysis.language_analysis.language }
-            ].map((item, idx) => (
-              <div key={idx} className="flex justify-between border-b border-borderToken/35 pb-1.5">
-                <span className="text-muted font-medium">{item.label}</span>
-                <span className="text-main font-bold truncate max-w-[140px]" title={String(item.value)}>
-                  {renderHighlighted(item.value)}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Readability & Target Audience Meter */}
-          <div className="border-t border-borderToken/40 pt-3 mt-1">
-            <span className="text-[9px] text-muted font-bold uppercase block mb-1.5">Readability & Difficulty Level</span>
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <div className="flex justify-between text-[10px] font-bold text-main mb-1">
-                  <span>{analysis.readability_scores.readingDifficulty}</span>
-                  <span>{analysis.readability_scores.fleschReadingEase} / 100</span>
-                </div>
-                <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                  <div 
-                    className="bg-primary h-full transition-all" 
-                    style={{ width: `${analysis.readability_scores.fleschReadingEase}%` }} 
-                  />
-                </div>
-              </div>
-            </div>
-            <p className="text-[9px] text-muted mt-2 leading-relaxed">
-              Target Audience: <strong>{analysis.readability_scores.estimatedEducationLevel}</strong> (based on sentence structure analysis).
-            </p>
-          </div>
-        </Card>
-
-        {/* Text Stats & Summary Diagnostics */}
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken lg:col-span-2">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-emerald-500" />
-              <h3 className="font-bold text-xs font-display text-main">Key Statistics & Summarization Diagnostics</h3>
-            </div>
-            <span className="text-[9px] text-muted uppercase font-bold">Performance Metrics</span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-            <div className="border-r border-borderToken/30 pr-2">
-              <span className="text-muted block">Total Words</span>
-              <strong className="block text-main font-bold text-lg mt-0.5">{renderHighlighted(analysis.text_statistics.totalWords)}</strong>
-            </div>
-            <div className="border-r border-borderToken/30 pr-2">
-              <span className="text-muted block">Total Sentences</span>
-              <strong className="block text-main font-bold text-lg mt-0.5">{renderHighlighted(analysis.text_statistics.sentenceCount)}</strong>
-            </div>
-            <div className="border-r border-borderToken/30 pr-2">
-              <span className="text-muted block">Read Time (Est)</span>
-              <strong className="block text-primary font-bold text-lg mt-0.5">{Math.max(1, Math.round(analysis.text_statistics.totalWords / 200))} min</strong>
-            </div>
-            <div>
-              <span className="text-muted block">Speech Time (Est)</span>
-              <strong className="block text-emerald-500 font-bold text-lg mt-0.5">{Math.max(1, Math.round(analysis.text_statistics.totalWords / 130))} min</strong>
-            </div>
-          </div>
-
-          {analysis.summarization_analysis ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-50/50 dark:bg-slate-900/10 border border-borderToken/40 p-4 rounded-xl text-xs mt-2.5">
-              <div>
-                <span className="text-muted">Original vs Summary Words</span>
-                <strong className="block text-main font-bold text-sm mt-0.5">
-                  {analysis.text_statistics.totalWords.toLocaleString()} / {Math.round(analysis.summarization_analysis.summaryLength / 6)}
-                </strong>
-              </div>
-              <div>
-                <span className="text-muted">Compression Ratio</span>
-                <strong className="block text-primary font-bold text-sm mt-0.5">
-                  {analysis.summarization_analysis.compressionRatio}%
-                </strong>
-              </div>
-              <div>
-                <span className="text-muted">Reading Time Saved</span>
-                <strong className="block text-emerald-500 font-bold text-sm mt-0.5">
-                  {analysis.summarization_analysis.readingTimeSaved} min
-                </strong>
-              </div>
-              <div>
-                <span className="text-muted">Info Retention</span>
-                <strong className="block text-amber-500 font-bold text-sm mt-0.5">
-                  {analysis.summarization_analysis.informationRetention}%
-                </strong>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center p-6 bg-slate-50/50 dark:bg-slate-900/10 border border-dashed border-borderToken rounded-xl text-xs text-muted mt-2.5">
-              Generate a summary in the <strong>Summarizer</strong> page to unlock comparison diagnostics.
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Row 2: Topics Modelling & Sentiment Emotions Profile */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Topics modelling */}
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <Map className="w-4 h-4 text-primary" />
-              <h3 className="font-bold text-xs font-display text-main">Topics Modelling Distribution</h3>
-            </div>
-            <Badge variant="primary" className="text-[9px] font-bold">{analysis.topics.mainTopic}</Badge>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-            <div className="h-[200px]">
-              <ReactApexChart
-                options={topicChartOptions}
-                series={topicChartSeries}
-                type="bar"
-                height="100%"
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:flex-initial md:w-64">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted" />
+              <input
+                type="text"
+                placeholder="Search in document..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setShowSearchDropdown(true)}
+                onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
+                className="w-full bg-surface border border-borderToken rounded-lg pl-9 pr-12 py-2 text-xs text-main focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-sm"
               />
-            </div>
-
-            <div className="flex flex-col gap-2.5 text-xs max-h-[220px] overflow-y-auto pr-1">
-              <span className="text-[9px] font-bold text-muted uppercase">Extracted Topic Elements</span>
-              {analysis.topics.distribution.map((item, idx) => (
-                <div key={idx} className="flex flex-col gap-1 pb-1.5 border-b border-borderToken/35">
-                  <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-main">{renderHighlighted(item.topic)}</span>
-                    <span className="text-muted">{renderHighlighted(item.distribution)}%</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mt-0.5">
-                    {item.subtopics.map((sub, sIdx) => (
-                      <span key={sIdx} className="bg-slate-100 dark:bg-slate-800 px-1 rounded-sm text-[8px] text-muted font-semibold">
-                        {renderHighlighted(sub)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        {/* Sentiment & Emotions Profile */}
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <SmilePlus className="w-4 h-4 text-emerald-500" />
-              <h3 className="font-bold text-xs font-display text-main">Sentiment & Emotions Profile</h3>
-            </div>
-            <span className="text-[9px] text-muted font-bold">Tone Percentages</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-            <div className="flex items-center justify-center">
-              <ReactApexChart
-                options={sentimentChartOptions}
-                series={sentimentChartSeries}
-                type="pie"
-                width={260}
-              />
-            </div>
-
-            {/* Emotions breakdown */}
-            <div className="flex flex-col gap-2.5 text-xs">
-              <span className="text-[9px] font-bold text-muted uppercase">Emotion Spectrum Distribution</span>
-              {Object.entries(analysis.sentiment_emotion.emotions).map(([emotion, val]) => (
-                <div key={emotion} className="flex flex-col gap-1">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-muted capitalize">{emotion}</span>
-                    <strong className="text-main">{renderHighlighted(val)}%</strong>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                    <div 
-                      className="bg-primary h-full transition-all" 
-                      style={{ width: `${val}%` }} 
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Row 3: Key Takeaways & Key Entities Map */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Key Takeaways Card */}
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <List className="w-4 h-4 text-emerald-500" />
-              <h3 className="font-bold text-xs font-display text-main">Key Takeaways & Action Items</h3>
-            </div>
-            <Badge variant="primary" className="text-[8px]">EXTRACTED</Badge>
-          </div>
-          <div className="flex flex-col gap-3 text-xs justify-center flex-1 py-1">
-            {takeaways.length > 0 ? (
-              takeaways.map((takeaway, idx) => (
-                <div key={idx} className="flex gap-2.5 items-start leading-relaxed text-main font-medium">
-                  <span className="flex items-center justify-center bg-primary/10 text-primary font-bold text-[9px] w-5 h-5 rounded-full shrink-0 mt-0.5">
-                    {idx + 1}
-                  </span>
-                  <span>{renderHighlighted(takeaway)}</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-muted italic text-center text-[11px] py-4">No specific key takeaways could be extracted.</p>
-            )}
-          </div>
-        </Card>
-
-        {/* Key Entities Map Card */}
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <Compass className="w-4 h-4 text-indigo-500" />
-              <h3 className="font-bold text-xs font-display text-main">Key References & Mentions</h3>
-            </div>
-            <span className="text-[9px] text-muted font-bold">NER Mapping</span>
-          </div>
-
-          <div className="flex flex-col gap-3.5 text-xs justify-center flex-1">
-            {[
-              { category: "Important People", list: analysis.ner_results.Person, color: "bg-primary/10 text-primary border-primary/20" },
-              { category: "Organizations & Brands", list: analysis.ner_results.Organization, color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" },
-              { category: "Locations & Countries", list: analysis.ner_results.Location, color: "bg-pink-500/10 text-pink-500 border-pink-500/20" }
-            ].map((ent, idx) => (
-              <div key={idx} className="flex flex-col gap-1.5 border-b border-borderToken/25 pb-2.5 last:border-0 last:pb-0">
-                <span className="text-[9px] font-bold text-muted uppercase">{ent.category}</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {ent.list && ent.list.length > 0 ? (
-                    ent.list.slice(0, 4).map((item: string, i: number) => (
-                      <span key={i} className={`px-2 py-0.5 rounded border text-[9px] font-semibold ${ent.color}`}>
-                        {renderHighlighted(item)}
-                      </span>
-                    ))
+              <div className="absolute right-2 top-2 text-[10px] text-muted font-bold tracking-wider bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">Ctrl+K</div>
+              
+              {showSearchDropdown && searchQuery.length > 2 && (
+                <div className="absolute top-12 left-0 w-full md:w-80 bg-surface border border-borderToken rounded-lg shadow-xl z-50 overflow-hidden flex flex-col max-h-80">
+                  {searchLoading ? (
+                    <div className="p-4 flex items-center justify-center text-muted text-xs"><Loader2 className="w-4 h-4 animate-spin mr-2"/> Searching...</div>
+                  ) : searchResults && searchResults.length > 0 ? (
+                    <div className="overflow-y-auto custom-scrollbar">
+                      {searchResults.map((res, i) => (
+                        <div key={i} onClick={() => handleViewSource(res.page)} className="p-3 border-b border-borderToken hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-[10px] font-bold text-primary">Page {res.page}</span>
+                            <span className="text-[9px] text-muted opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">View Source <ArrowRight className="w-2.5 h-2.5"/></span>
+                          </div>
+                          <p className="text-xs text-main/80 line-clamp-3 leading-relaxed">...{res.text}...</p>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    <span className="text-[9px] text-muted italic">None detected</span>
+                    <div className="p-4 text-center text-muted text-xs">No results found in this document.</div>
                   )}
                 </div>
+              )}
+            </div>
+
+            <Button variant="outline" size="sm" onClick={() => fetchAnalysis(true)} disabled={refreshing} className="text-xs h-9 shadow-sm bg-surface">
+              <RefreshCw className={`w-3.5 h-3.5 mr-2 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
+            </Button>
+
+            <div className="relative">
+              <Button size="sm" onClick={() => setExportDropdownOpen(!exportDropdownOpen)} disabled={!!exportLoading} className="text-xs h-9 shadow-sm min-w-[120px] bg-primary text-white hover:bg-primary/90">
+                {exportLoading ? <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> Exporting...</> : <>Export Report <ChevronDown className="w-3.5 h-3.5 ml-2"/></>}
+              </Button>
+              {exportDropdownOpen && (
+                <div className="absolute right-0 top-11 w-32 bg-surface border border-borderToken rounded-lg shadow-xl py-1 z-50 flex flex-col overflow-hidden">
+                  {["pdf", "excel", "csv", "json", "txt"].map(fmt => (
+                    <button key={fmt} onClick={() => handleExport(fmt)} className="px-4 py-2.5 text-xs font-bold text-left text-muted hover:text-primary hover:bg-primary/5 transition-colors uppercase">
+                      {fmt === "excel" ? "XLSX" : fmt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-8 w-full overflow-x-auto custom-scrollbar pt-4">
+          {["Overview", "Structure", "Insights", "Keywords", "Entities", "Charts", "Ask Document"].map(tab => (
+            <button 
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`pb-4 text-sm font-semibold transition-colors relative whitespace-nowrap ${activeTab === tab ? 'text-primary' : 'text-muted hover:text-main'}`}
+            >
+              {tab}
+              {activeTab === tab && <div className="absolute bottom-0 left-0 w-full h-[3px] bg-primary rounded-t-full" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="pt-6">
+        {activeTab === "Ask Document" && (
+          <Card className="p-6 flex flex-col gap-6 shadow-sm border border-borderToken max-w-4xl mx-auto">
+            <div className="flex items-center gap-2 border-b border-borderToken pb-4">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              <h3 className="font-bold text-sm text-main uppercase tracking-wide">Ask This Document</h3>
+            </div>
+            
+            {qaHistory.length > 0 && (
+              <div className="flex flex-col gap-5 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+                {qaHistory.map((item, i) => (
+                  <div key={i} className="flex flex-col gap-3">
+                    <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl rounded-tl-none self-start max-w-[85%] border border-borderToken">
+                      <p className="text-sm font-bold text-main">{item.q}</p>
+                    </div>
+                    <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl rounded-tr-none self-end max-w-[85%]">
+                      <AIResponseRenderer content={item.a} />
+                      {item.sources.length > 0 && (
+                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-primary/10">
+                          <span className="text-[10px] text-primary/70 font-bold uppercase tracking-wider">Sources</span>
+                          {item.sources.map((p, j) => (
+                            <button key={j} onClick={() => handleViewSource(p)} className="text-[10px] font-bold bg-primary/10 hover:bg-primary/20 text-primary px-2 py-1 rounded transition-colors flex items-center gap-1 border border-primary/20">
+                              Page {p}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            
+            <div className="flex items-center gap-3 relative mt-2">
+              <input 
+                type="text" 
+                placeholder="E.g., What is the main objective of this document?" 
+                value={qaQuery}
+                onChange={(e) => setQaQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
+                className="w-full bg-surface border border-borderToken rounded-xl pl-5 pr-12 py-3 text-sm text-main focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-inner"
+              />
+              <Button onClick={handleAsk} disabled={qaLoading || !qaQuery.trim()} className="absolute right-2 h-9 w-9 p-0 shrink-0 bg-primary hover:bg-primary/90 text-white rounded-lg">
+                {qaLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
+              </Button>
+            </div>
+          </Card>
+        )}
+
+        {analysis && (
+          <div className="flex flex-col gap-6">
+            
+            {activeTab === "Overview" && (
+              <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+                  <Card className="p-4 shadow-sm border border-borderToken flex flex-col gap-3 relative overflow-hidden group hover:shadow-md transition-shadow bg-surface">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-500 border border-indigo-100 dark:border-indigo-500/20 shrink-0 group-hover:scale-110 transition-transform">
+                        <span className="font-bold text-lg font-serif">T</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Total Words</span>
+                        <strong className="text-xl font-black text-main">{stats.totalWords?.toLocaleString() || 0}</strong>
+                      </div>
+                    </div>
+                  </Card>
+                  <Card className="p-4 shadow-sm border border-borderToken flex flex-col gap-3 relative overflow-hidden group hover:shadow-md transition-shadow bg-surface">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-500 border border-emerald-100 dark:border-emerald-500/20 shrink-0 group-hover:scale-110 transition-transform">
+                        <List className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Sentences</span>
+                        <strong className="text-xl font-black text-main">{stats.sentenceCount?.toLocaleString() || 0}</strong>
+                      </div>
+                    </div>
+                  </Card>
+                  <Card className="p-4 shadow-sm border border-borderToken flex flex-col gap-3 relative overflow-hidden group hover:shadow-md transition-shadow bg-surface">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-100 dark:border-blue-500/20 shrink-0 group-hover:scale-110 transition-transform">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Reading Time</span>
+                        <strong className="text-xl font-black text-main">{Math.max(1, Math.round((stats.totalWords || 0) / 200))} min</strong>
+                      </div>
+                    </div>
+                  </Card>
+                  <Card className="p-4 shadow-sm border border-borderToken flex flex-col gap-3 relative overflow-hidden group hover:shadow-md transition-shadow bg-surface">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-100 dark:border-amber-500/20 shrink-0 group-hover:scale-110 transition-transform">
+                        <Mic className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Speech Time</span>
+                        <strong className="text-xl font-black text-main">{Math.max(1, Math.round((stats.totalWords || 0) / 130))} min</strong>
+                      </div>
+                    </div>
+                  </Card>
+                  <Card className="p-4 shadow-sm border border-borderToken flex flex-col gap-3 relative overflow-hidden group hover:shadow-md transition-shadow bg-surface">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-cyan-50 dark:bg-cyan-500/10 flex items-center justify-center text-cyan-500 border border-cyan-100 dark:border-cyan-500/20 shrink-0 group-hover:scale-110 transition-transform">
+                        <FileBadge className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Pages Processed</span>
+                        <strong className="text-xl font-black text-main">{stats.pagesProcessed || 0} / {analysis.page_count}</strong>
+                      </div>
+                    </div>
+                  </Card>
+                  <Card className="p-4 shadow-sm border border-borderToken flex flex-col gap-3 relative overflow-hidden group hover:shadow-md transition-shadow bg-surface">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center text-purple-500 border border-purple-100 dark:border-purple-500/20 shrink-0 group-hover:scale-110 transition-transform">
+                        <Globe className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Language</span>
+                        <strong className="text-xl font-black text-main capitalize">{analysis.language_analysis.language}</strong>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card className="p-5 flex flex-col gap-5 shadow-sm border border-borderToken bg-surface">
+                    <div className="flex items-center gap-2 border-b border-borderToken pb-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      <h3 className="font-bold text-xs text-main uppercase tracking-wide">Document Processing Status</h3>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="flex flex-col gap-3 flex-1">
+                        <div className="flex items-center gap-2 text-sm text-main">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span>File validated</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-main">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span>{analysis.page_count} pages detected</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-main">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span>Text extracted</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-main">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span>Language detected</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-main">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <span>NLP analysis completed</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                  
+                  <Card className="p-5 flex flex-col gap-4 shadow-sm border border-borderToken bg-surface">
+                    <div className="flex justify-between items-center border-b border-borderToken pb-2">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        <h3 className="font-bold text-xs text-main uppercase tracking-wide">AI Document Overview</h3>
+                      </div>
+                    </div>
+                    <AIResponseRenderer content={displayOverview || "No overview available."} />
+                  </Card>
+                </div>
+              </div>
+            )}
+            
+            {activeTab === "Structure" && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <Card className="p-5 flex flex-col gap-4 shadow-sm border border-borderToken bg-surface">
+                  <div className="flex justify-between items-center border-b border-borderToken pb-2">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-primary" />
+                      <h3 className="font-bold text-xs text-main uppercase tracking-wide">Document Structure</h3>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3 text-xs">
+                     <div className="flex justify-between font-bold text-muted uppercase border-b border-borderToken pb-2">
+                       <span>Chapter / Section</span>
+                       <span>Page</span>
+                     </div>
+                     {stats.structure && stats.structure.length > 0 ? stats.structure.map((item, idx) => (
+                       <div key={idx} className="flex justify-between hover:bg-slate-50 dark:hover:bg-slate-800 p-2 -mx-2 rounded cursor-pointer group" onClick={() => handleViewSource(item.start_page || item.page || 1)}>
+                         <span className="font-bold text-main group-hover:text-primary transition-colors">{item.section}</span>
+                         <span className="text-muted">p.{item.start_page || item.page || ""}</span>
+                       </div>
+                     )) : <div className="py-4 text-center text-muted italic">No structure detected.</div>}
+                  </div>
+                </Card>
+              </div>
+            )}
+            
+            {activeTab === "Insights" && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex flex-col gap-6">
+                  <Card className="p-5 flex flex-col gap-4 shadow-sm border border-borderToken bg-surface">
+                    <div className="flex justify-between items-center border-b border-borderToken pb-2">
+                      <div className="flex items-center gap-2">
+                        <List className="w-4 h-4 text-primary" />
+                        <h3 className="font-bold text-xs text-main uppercase tracking-wide">Key Insights & Takeaways</h3>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      {stats.takeaways && stats.takeaways.length > 0 ? stats.takeaways.map((takeaway, idx) => (
+                        <div key={idx} className="flex gap-3 items-start group">
+                          <span className="flex items-center justify-center bg-primary/10 text-primary font-black text-[10px] w-5 h-5 rounded-full mt-0.5 shrink-0">
+                            {idx + 1}
+                          </span>
+                          <div className="flex items-start justify-between w-full gap-2">
+                            <span className="text-xs font-medium text-main leading-relaxed">{renderHighlighted(takeaway.text)}</span>
+                            <button onClick={() => handleViewSource(takeaway.page)} className="text-[10px] font-bold text-muted hover:text-primary whitespace-nowrap pt-0.5">
+                              Page {takeaway.page}
+                            </button>
+                          </div>
+                        </div>
+                      )) : <div className="py-4 text-center text-muted italic">No takeaways extracted.</div>}
+                    </div>
+                  </Card>
+                </div>
+                
+                <div className="flex flex-col gap-6">
+                  <Card className="p-5 flex flex-col gap-5 shadow-sm border border-borderToken bg-surface">
+                    <div className="flex justify-between items-center border-b border-borderToken pb-2">
+                      <div className="flex items-center gap-2">
+                        <Compass className="w-4 h-4 text-primary" />
+                        <h3 className="font-bold text-xs text-main uppercase tracking-wide">Tone & Writing Style</h3>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-[10px] text-muted uppercase font-bold tracking-wider mb-1 block">Overall Tone</span>
+                        <strong className="text-primary font-bold capitalize text-sm">{tone.tone || "Formal"}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-muted uppercase font-bold tracking-wider mb-1 block">Writing Style</span>
+                        <strong className="text-primary font-bold capitalize text-sm line-clamp-2">{tone.writingStyle || "Academic"}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-muted uppercase font-bold tracking-wider mb-1 block">Sentiment</span>
+                        <strong className="text-emerald-500 font-bold capitalize text-sm">{tone.sentiment || "Positive"}</strong>
+                      </div>
+                    </div>
+                  </Card>
+                  
+                  <Card className="p-5 flex flex-col gap-4 shadow-sm border border-borderToken bg-surface">
+                    <div className="flex justify-between items-center border-b border-borderToken pb-2">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-amber-500" />
+                        <h3 className="font-bold text-xs text-main uppercase tracking-wide">Important Facts & Figures</h3>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      {stats.facts && stats.facts.length > 0 ? (
+                        stats.facts.slice(0,4).map((fact, idx) => (
+                          <div key={idx} className="flex gap-3 items-start group pt-2 border-t border-borderToken/50 first:pt-0 first:border-0">
+                            <div className="w-6 h-6 rounded-md bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-500 border border-amber-100 dark:border-amber-500/20 mt-0.5 shrink-0">
+                              <Activity className="w-3 h-3" />
+                            </div>
+                            <div className="flex flex-col w-full">
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="text-xs font-medium text-main leading-relaxed">{renderHighlighted(fact.value || fact.text || fact.fact || fact.description || "Fact")}</span>
+                                <button onClick={() => handleViewSource(fact.page)} className="text-[10px] font-bold text-muted hover:text-primary whitespace-nowrap pt-0.5">
+                                  Page {fact.page}
+                                </button>
+                              </div>
+                              {fact.context && <p className="text-[10px] text-muted line-clamp-2 mt-0.5">{fact.context}</p>}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-muted italic text-xs py-4">No facts extracted.</div>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+              </div>
+            )}
+            
+            {activeTab === "Keywords" && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <Card className="p-5 flex flex-col gap-4 shadow-sm border border-borderToken bg-surface">
+                  <div className="flex justify-between items-center border-b border-borderToken pb-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-primary" />
+                      <h3 className="font-bold text-xs text-main uppercase tracking-wide">Key Concepts</h3>
+                    </div>
+                  </div>
+                  <div className="h-72 mt-2 relative">
+                     <ReactApexChart options={conceptsChartOptions} series={conceptsSeries} type="bar" height="100%" />
+                  </div>
+                </Card>
+              </div>
+            )}
+            
+            {activeTab === "Entities" && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <Card className="p-5 flex flex-col gap-4 shadow-sm border border-borderToken bg-surface">
+                  <div className="flex justify-between items-center border-b border-borderToken pb-2">
+                    <div className="flex items-center gap-2">
+                      <Compass className="w-4 h-4 text-primary" />
+                      <h3 className="font-bold text-xs text-main uppercase tracking-wide">Key Entities</h3>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-6">
+                                        {[
+                      { category: "People", list: entities.People || entities.people || [], color: "text-rose-600 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-900/20 dark:border-rose-800/30" },
+                      { category: "Organizations", list: entities.Organizations || entities.organizations || [], color: "text-amber-600 bg-amber-50 border-amber-200 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-800/30" },
+                      { category: "Locations", list: entities.Locations || entities.locations || [], color: "text-emerald-600 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-800/30" },
+                      { category: "Technologies", list: entities.Technologies || entities.technologies || [], color: "text-indigo-600 bg-indigo-50 border-indigo-200 dark:text-indigo-400 dark:bg-indigo-900/20 dark:border-indigo-800/30" },
+                      { category: "Models", list: entities.Models || entities.models || [], color: "text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/20 dark:border-blue-800/30" },
+                      { category: "Dates", list: entities.Dates || entities.dates || [], color: "text-muted bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-900/20 dark:border-gray-800/30" },
+                    ].map((ent, idx) => {
+                      if (!ent.list || ent.list.length === 0) return null;
+                      return (
+                        <div key={idx} className="flex flex-col gap-2">
+                          <span className="text-xs font-bold text-muted uppercase tracking-wider border-b border-borderToken pb-1">{ent.category}</span>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {ent.list.slice(0,12).map((item: any, i: number) => (
+                              <div key={i} className={`px-2.5 py-1 rounded text-xs font-semibold border ${ent.color}`}>
+                                {renderHighlighted(item.entity)} <span className="opacity-60 ml-1 text-[10px]">({item.count})</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              </div>
+            )}
+            
+            {activeTab === "Charts" && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <Card className="p-5 flex flex-col gap-4 shadow-sm border border-borderToken bg-surface max-w-2xl mx-auto">
+                  <div className="flex justify-between items-center border-b border-borderToken pb-2">
+                    <div className="flex items-center gap-2">
+                      <Map className="w-4 h-4 text-primary" />
+                      <h3 className="font-bold text-xs text-main uppercase tracking-wide">Topics Distribution</h3>
+                    </div>
+                  </div>
+                  <div className="flex items-center h-64 mt-4 relative justify-center">
+                    <ReactApexChart options={topicsChartOptions} series={topicsSeries} type="donut" width="100%" height="100%" />
+                  </div>
+                </Card>
+              </div>
+            )}
+            
           </div>
-        </Card>
+        )}
       </div>
 
-      {/* Row 4: Keywords Bar & Word Cloud */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Keywords chart */}
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-pink-500" />
-              <h3 className="font-bold text-xs font-display text-main">Keywords Importance</h3>
+      {/* Document Viewer Modal */}
+      {viewerPage !== null && viewerUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-5xl h-[90vh] flex flex-col bg-surface shadow-2xl border border-borderToken overflow-hidden animate-in zoom-in-95 duration-200 rounded-xl">
+            <div className="flex justify-between items-center p-3 border-b border-borderToken bg-slate-50 dark:bg-slate-900">
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-bold text-sm text-main">{currentDocument?.name}</h3>
+                  <p className="text-xs text-muted">Viewing Page {viewerPage}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setViewerPage(Math.max(1, viewerPage - 1))}>Prev</Button>
+                <Button variant="outline" size="sm" onClick={() => setViewerPage(viewerPage + 1)}>Next</Button>
+                <div className="w-px h-6 bg-borderToken mx-2"></div>
+                <Button variant="outline" size="sm" onClick={() => setViewerPage(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-            <span className="text-[9px] text-muted font-bold">Occurrences Count</span>
-          </div>
-          <div className="h-[220px]">
-            <ReactApexChart
-              options={keywordChartOptions}
-              series={keywordChartSeries}
-              type="bar"
-              height="100%"
-            />
-          </div>
-        </Card>
-
-        {/* Word Cloud */}
-        <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken">
-          <div className="flex justify-between items-center border-b border-borderToken pb-2">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <h3 className="font-bold text-xs font-display text-main">Semantic Word Cloud</h3>
+            <div className="flex-1 w-full bg-slate-100 dark:bg-slate-800">
+              <iframe 
+                src={`${viewerUrl}#page=${viewerPage}`} 
+                className="w-full h-full border-none"
+                title="Document Viewer"
+              />
             </div>
-            <span className="text-[9px] text-muted font-bold">Terms Weight</span>
-          </div>
-          <div className="flex-1 flex flex-wrap gap-x-3.5 gap-y-2.5 items-center justify-center p-3.5 bg-slate-50/50 dark:bg-slate-900/10 rounded-xl border border-borderToken select-none min-h-[220px]">
-            {wordCloudTags.map((tag, idx) => (
-              <span 
-                key={idx} 
-                className={`${tag.weight} cursor-pointer hover:scale-110 hover:text-primary transition-all duration-200`}
-              >
-                {renderHighlighted(tag.text)}
-              </span>
-            ))}
-          </div>
-        </Card>
-      </div>
+          </Card>
+        </div>
+      )}
 
     </div>
   );

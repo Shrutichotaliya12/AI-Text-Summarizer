@@ -82,9 +82,9 @@ async def upload_document(
     
     try:
         mime_type = file.content_type or ""
-        text = extract_text_from_bytes(contents, filename, mime_type)
-        if ext == "pdf":
-            pages = max(1, len(text) // 1500)
+        parsed_data = extract_text_from_bytes(contents, filename, mime_type)
+        text = parsed_data["text"]
+        pages = parsed_data["page_count"]
     except ValueError as ve:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -250,6 +250,34 @@ def get_single_document(
         "pageCount": doc.page_count,
         "isFavorite": doc.is_favorite,
     }
+
+@router.get("/document/{doc_id}/raw")
+def get_raw_document(
+    doc_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Fetch the raw binary bytes of a document (e.g. for PDF viewing)."""
+    doc = db.query(Document).filter(
+        Document.id == doc_id,
+        Document.user_id == current_user.id
+    ).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    if not doc.original_file_bytes:
+        raise HTTPException(status_code=404, detail="Original document file not found")
+        
+    mime = "application/pdf" if doc.type.lower() == "pdf" else "application/octet-stream"
+    
+    return Response(
+        content=doc.original_file_bytes, 
+        media_type=mime,
+        headers={
+            "Content-Disposition": f"inline; filename=\"{doc.name}\"",
+            "Accept-Ranges": "bytes"
+        }
+    )
 
 @router.get("/")
 

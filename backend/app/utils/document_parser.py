@@ -5,53 +5,79 @@ from bs4 import BeautifulSoup
 import docx
 import pypdf
 
-def extract_text_from_bytes(file_bytes: bytes, file_name: str, mime_type: str) -> str:
+def extract_text_from_bytes(file_bytes: bytes, file_name: str, mime_type: str) -> dict:
     """
     Extracts text from various file formats using the provided file bytes.
+    Returns a dict with text, page_count, ocr_required, and extraction_successful.
     """
     file_ext = file_name.split('.')[-1].lower() if '.' in file_name else ''
     
+    result = {
+        "text": "",
+        "pages": [],
+        "page_count": 1,
+        "ocr_required": False,
+        "extraction_successful": False
+    }
+    
     try:
         if file_ext == 'pdf' or mime_type == 'application/pdf':
-            return _extract_pdf(file_bytes)
-        
+            pdf_data = _extract_pdf(file_bytes)
+            result["text"] = pdf_data["text"]
+            result["pages"] = pdf_data["pages"]
+            result["page_count"] = pdf_data["page_count"]
+            if not result["text"].strip():
+                result["ocr_required"] = True
+                
         elif file_ext in ['docx', 'doc'] or 'wordprocessingml' in mime_type:
-            return _extract_docx(file_bytes)
+            result["text"] = _extract_docx(file_bytes)
             
         elif file_ext == 'csv' or mime_type == 'text/csv':
-            return _extract_csv(file_bytes)
+            result["text"] = _extract_csv(file_bytes)
             
         elif file_ext in ['xlsx', 'xls'] or 'spreadsheetml' in mime_type:
-            return _extract_excel(file_bytes)
+            result["text"] = _extract_excel(file_bytes)
             
         elif file_ext in ['md', 'markdown'] or mime_type == 'text/markdown':
-            # Markdown text is essentially raw text
-            return file_bytes.decode('utf-8', errors='ignore')
+            result["text"] = file_bytes.decode('utf-8', errors='ignore')
             
         elif file_ext in ['html', 'htm'] or mime_type == 'text/html':
-            return _extract_html(file_bytes)
+            result["text"] = _extract_html(file_bytes)
             
         elif file_ext == 'json' or mime_type == 'application/json':
-            return _extract_json(file_bytes)
+            result["text"] = _extract_json(file_bytes)
             
         elif file_ext in ['png', 'jpg', 'jpeg', 'webp'] or 'image' in mime_type:
-            return "Image File (Text extraction not supported currently)"
+            result["ocr_required"] = True
+            result["text"] = ""
             
         else:
-            # Fallback to plain text
-            return file_bytes.decode('utf-8', errors='ignore')
+            result["text"] = file_bytes.decode('utf-8', errors='ignore')
+            
+        result["text"] = result["text"].strip()
+        if not result["pages"]:
+            result["pages"] = [result["text"]] if result["text"] else []
+        result["extraction_successful"] = len(result["text"]) > 0
+        
+        return result
             
     except Exception as e:
-        raise ValueError(f"Failed to extract text from {file_name}: {str(e)}")
+        # Don't fail completely on corrupt, return failed extraction
+        result["extraction_successful"] = False
+        return result
 
-def _extract_pdf(file_bytes: bytes) -> str:
+def _extract_pdf(file_bytes: bytes) -> dict:
     text = ""
+    pages = []
     reader = pypdf.PdfReader(io.BytesIO(file_bytes))
     for page in reader.pages:
         page_text = page.extract_text()
         if page_text:
             text += page_text + "\n"
-    return text.strip()
+            pages.append(page_text)
+        else:
+            pages.append("")
+    return {"text": text.strip(), "pages": pages, "page_count": len(reader.pages)}
 
 def _extract_docx(file_bytes: bytes) -> str:
     doc = docx.Document(io.BytesIO(file_bytes))

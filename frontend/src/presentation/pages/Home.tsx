@@ -77,13 +77,24 @@ export const Home: React.FC = () => {
   const [docsSummarized, setDocsSummarized] = useState(0);
 
   // Phase 4 New States
-  const [activeSummary, setActiveSummary] = useState<any>(null);
+  const [activeSummary, setActiveSummary] = useState<any>(() => {
+    const saved = typeof window !== 'undefined' ? sessionStorage.getItem('homeActiveSummary') : null;
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  // Keep sessionStorage in sync
+  useEffect(() => {
+    if (activeSummary) {
+      sessionStorage.setItem('homeActiveSummary', JSON.stringify(activeSummary));
+    }
+  }, [activeSummary]);
   const [previousSummary, setPreviousSummary] = useState<any>(null);
   const [isComparing, setIsComparing] = useState(false);
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [historySearch, setHistorySearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [isModelDetailsOpen, setIsModelDetailsOpen] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -96,8 +107,20 @@ export const Home: React.FC = () => {
 
   // Load latest summary, user history lists and stats on mount
   const loadWorkspace = async () => {
-    if (useModelStore.getState().workspaceInputText) {
+    const store = useModelStore.getState();
+    const hasExistingText = store.workspaceInputText || store.workspaceSummaryText;
+    
+    // If we already have state and active summary locally, don't overwrite from backend
+    if (hasExistingText && sessionStorage.getItem('homeActiveSummary')) {
       fetchHistory();
+      
+      try {
+        const statsResponse = await apiClient.get("/analytics/stats");
+        if (statsResponse.data.metrics) {
+          setDocsSummarized(statsResponse.data.metrics.documents_summarized || 0);
+        }
+      } catch (e) {}
+      
       return;
     }
 
@@ -105,23 +128,25 @@ export const Home: React.FC = () => {
       const latestResponse = await apiClient.get("/summary/latest");
       if (latestResponse.data.status === "success" && latestResponse.data.summary) {
         const s = latestResponse.data.summary;
-        setInputText(s.originalText || "");
-        setSummaryText(s.summaryText || "");
-        setInferenceTime(s.latency || 0);
-        setCompressionRatio(s.compression || 0);
-        setConfidenceScore(s.confidence || 0);
-        setTimeSaved(s.readingTimeSaved || 0);
-        setActiveSummary(s);
-        setCurrentKeywords(Array.isArray(s.keywords) ? s.keywords : []);
-        setCurrentLanguage(s.language || "en");
         
-        if (s.modelUsed) {
-          setSelectedModelId(s.modelUsed);
+        if (!hasExistingText) {
+          setInputText(s.originalText || "");
+          setSummaryText(s.summaryText || "");
+          setInferenceTime(s.latency || 0);
+          setCompressionRatio(s.compression || 0);
+          setConfidenceScore(s.confidence || 0);
+          setTimeSaved(s.readingTimeSaved || 0);
+          setCurrentKeywords(Array.isArray(s.keywords) ? s.keywords : []);
+          setCurrentLanguage(s.language || "en");
+          if (s.modelUsed) {
+            setSelectedModelId(s.modelUsed);
+          }
+          const words = s.originalText ? s.originalText.trim().split(/\s+/).length : 0;
+          const sumWords = s.summaryText ? s.summaryText.trim().split(/\s+/).length : 0;
+          setWordsSaved(Math.max(0, words - sumWords));
         }
-
-        const words = s.originalText ? s.originalText.trim().split(/\s+/).length : 0;
-        const sumWords = s.summaryText ? s.summaryText.trim().split(/\s+/).length : 0;
-        setWordsSaved(Math.max(0, words - sumWords));
+        
+        setActiveSummary(s);
       }
     } catch (error) {
       console.error("Failed to load latest summary:", error);
@@ -187,7 +212,7 @@ export const Home: React.FC = () => {
         signal: abortControllerRef.current.signal
       });
       
-      const { summary, confidence, compression_ratio, latency, id } = response.data;
+      const { summary, confidence, compression_ratio, latency, id, language } = response.data;
       
       setSummaryText(summary);
       setInferenceTime(latency);
@@ -213,13 +238,8 @@ export const Home: React.FC = () => {
       )].slice(0, 8);
       setCurrentKeywords(extracted);
 
-      // Try to get user settings language
-      try {
-        const settingsRes = await apiClient.get("/auth/me");
-        setCurrentLanguage(settingsRes.data?.language || "en");
-      } catch (_) {
-        setCurrentLanguage("en");
-      }
+      const actualLang = language || "en";
+      setCurrentLanguage(actualLang);
 
       const activeRecord = {
         id,
@@ -231,7 +251,7 @@ export const Home: React.FC = () => {
         latency,
         readingTimeSaved: savedMins,
         keywords: extracted,
-        language: "en",
+        language: actualLang,
         createdDate: new Date().toISOString()
       };
       setActiveSummary(activeRecord);
@@ -332,8 +352,14 @@ export const Home: React.FC = () => {
     });
 
     success(`Restored: ${item.title}`);
-    // Scroll to top of workspace smoothly
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Scroll to workspace smoothly with offset to prevent layout jumping
+    setTimeout(() => {
+      const el = document.getElementById("workspace-anchor");
+      if (el) {
+        const y = el.getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({ top: y, behavior: "smooth" });
+      }
+    }, 50);
   };
 
   // Delete summary from list
@@ -541,7 +567,7 @@ export const Home: React.FC = () => {
             </h3>
             <p className="text-[10px] text-muted">Select an active neural network to perform text summaries</p>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {models
               .filter(m => m.downloadStatus === "downloaded" && m.availability === "active")
               .map(m => (
@@ -557,52 +583,70 @@ export const Home: React.FC = () => {
                   {m.name}
                 </button>
               ))}
+            <button
+              onClick={() => setIsModelDetailsOpen(!isModelDetailsOpen)}
+              className="ml-1 p-1.5 rounded-lg border border-borderToken text-muted hover:text-main hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none"
+              title="Toggle Model Details"
+            >
+              <ChevronRight className={`w-4 h-4 transition-transform duration-300 ${isModelDetailsOpen ? "rotate-90" : ""}`} />
+            </button>
           </div>
         </div>
 
         {/* Model specs detailed info */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="flex flex-col gap-1.5 md:col-span-2">
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <div><span className="text-[10px] text-muted font-semibold">Architecture:</span> <span className="font-bold text-main">{activeModel?.architecture || "Encoder-Decoder (Transformer)"}</span></div>
-              <div><span className="text-[10px] text-muted font-semibold">Context Length:</span> <span className="font-bold text-main">{activeModel?.context_length || "1024 tokens"}</span></div>
-              <div><span className="text-[10px] text-muted font-semibold">Memory Usage:</span> <span className="font-bold text-main">{activeModel?.memory_usage || activeModel?.memory || "N/A"}</span></div>
-            </div>
-            <div className="mt-1">
-              <span className="text-[10px] text-muted font-semibold">Model Capabilities:</span>
-              <p className="text-slate-600 dark:text-slate-300 leading-relaxed mt-0.5">{activeModel?.capabilities || "Dynamic text summarization and content condensation."}</p>
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-[10px]">
-              <div><span className="text-muted">Best Document Type:</span> <strong className="text-main">{activeModel?.best_doc_type || "News & Reports"}</strong></div>
-              <div><span className="text-muted">Expected Quality:</span> <strong className="text-main">{activeModel?.expected_quality || "High"}</strong></div>
-            </div>
-            <div className="mt-1 flex items-center gap-1.5 text-primary font-semibold">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Recommended use: {activeModel?.recommended_use || "General text summarization tasks"}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/10 p-3 rounded-lg border border-borderToken/30 text-[10px]">
-            <div className="flex flex-col">
-              <span className="text-muted">Inference Speed</span>
-              <strong className="text-main mt-0.5">{activeModel?.speed || "N/A"}</strong>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-muted">Estimated Latency</span>
-              <strong className="text-main mt-0.5">{activeModel?.latency || "N/A"}</strong>
-            </div>
-            <div className="flex flex-col col-span-2">
-              <span className="text-muted">Quality Rating</span>
-              <div className="flex items-center gap-2 mt-1">
-                <ProgressBar progress={activeModel?.quality_score || activeModel?.accuracy || 80} className="h-1.5 flex-1" />
-                <strong className="text-main font-bold shrink-0">{activeModel?.quality_score || activeModel?.accuracy || 80}%</strong>
+        <AnimatePresence>
+          {isModelDetailsOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-1">
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    <div><span className="text-[10px] text-muted font-semibold">Architecture:</span> <span className="font-bold text-main">{activeModel?.architecture || "Encoder-Decoder (Transformer)"}</span></div>
+                    <div><span className="text-[10px] text-muted font-semibold">Context Length:</span> <span className="font-bold text-main">{activeModel?.context_length || "1024 tokens"}</span></div>
+                    <div><span className="text-[10px] text-muted font-semibold">Memory Usage:</span> <span className="font-bold text-main">{activeModel?.memory_usage || activeModel?.memory || "N/A"}</span></div>
+                  </div>
+                  <div className="mt-1">
+                    <span className="text-[10px] text-muted font-semibold">Model Capabilities:</span>
+                    <p className="text-muted dark:text-slate-300 leading-relaxed mt-0.5">{activeModel?.capabilities || "Dynamic text summarization and content condensation."}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-[10px]">
+                    <div><span className="text-muted">Best Document Type:</span> <strong className="text-main">{activeModel?.best_doc_type || "News & Reports"}</strong></div>
+                    <div><span className="text-muted">Expected Quality:</span> <strong className="text-main">{activeModel?.expected_quality || "High"}</strong></div>
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-primary font-semibold">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Recommended use: {activeModel?.recommended_use || "General text summarization tasks"}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/10 p-3 rounded-lg border border-borderToken/30 text-[10px]">
+                  <div className="flex flex-col">
+                    <span className="text-muted">Inference Speed</span>
+                    <strong className="text-main mt-0.5">{activeModel?.speed || "N/A"}</strong>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-muted">Estimated Latency</span>
+                    <strong className="text-main mt-0.5">{activeModel?.latency || "N/A"}</strong>
+                  </div>
+                  <div className="flex flex-col col-span-2">
+                    <span className="text-muted">Quality Rating</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <ProgressBar progress={activeModel?.quality_score || activeModel?.accuracy || 80} className="h-1.5 flex-1" />
+                      <strong className="text-main font-bold shrink-0">{activeModel?.quality_score || activeModel?.accuracy || 80}%</strong>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Card>
 
       {/* 4. Main Workspace (Split Input / Outputs) – items-start prevents height coupling */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+      <div id="workspace-anchor" className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
         
         {/* Left Card: Input Workspace – NO h-full so it doesn't stretch with right panel */}
         <Card className="flex flex-col gap-4 bg-surface">

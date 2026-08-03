@@ -45,8 +45,4 @@ def get_db():
     finally:
         db.close()
 
-# Auto create tables on boot
-try:
-    Base.metadata.create_all(bind=engine)
-except Exception as e:
-    print(f"DB auto-initialization exception: {e}")
+# Database initialization moved to main.py after models are loaded

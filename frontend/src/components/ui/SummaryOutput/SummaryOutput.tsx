@@ -104,7 +104,7 @@ export const SummaryOutput: React.FC<SummaryOutputProps> = ({
   const [tone, setTone] = useState("Professional");
   const [format, setFormat] = useState<"paragraph" | "bullet">("paragraph");
   const [baseText, setBaseText] = useState(summary); // raw summary without tone/format transforms
-  const [selectedLang, setSelectedLang] = useState("en");
+  const [selectedLang, setSelectedLang] = useState("original");
   const [isTranslating, setIsTranslating] = useState(false);
   const [translatedText, setTranslatedText] = useState(""); // translated version of baseText
 
@@ -127,7 +127,7 @@ export const SummaryOutput: React.FC<SummaryOutputProps> = ({
   useEffect(() => {
     setBaseText(summary);
     setTranslatedText("");
-    setSelectedLang(language || "en");
+    setSelectedLang("original");
     setTone("Professional");
     setFormat("paragraph");
   }, [summary, language]);
@@ -202,7 +202,7 @@ export const SummaryOutput: React.FC<SummaryOutputProps> = ({
   // Real translation via backend API
   const handleTranslate = async (langCode: string) => {
     setSelectedLang(langCode);
-    if (langCode === "en") {
+    if (langCode === "original") {
       setTranslatedText("");
       setDisplayedText(applyToneToDisplay(summary, tone, format));
       return;
@@ -221,7 +221,7 @@ export const SummaryOutput: React.FC<SummaryOutputProps> = ({
       setDisplayedText(applyToneToDisplay(translated, tone, format));
     } catch (err) {
       toastError("Translation failed. Please try again.");
-      setSelectedLang("en");
+      setSelectedLang(language);
     } finally {
       setIsTranslating(false);
     }
@@ -230,11 +230,22 @@ export const SummaryOutput: React.FC<SummaryOutputProps> = ({
   // Shorten / Expand
   const handleShorten = () => {
     const source = translatedText || summary;
-    const sentences = source.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 5);
-    if (sentences.length > 2) {
-      const shortened = sentences.slice(0, Math.ceil(sentences.length / 2)).join(". ") + ".";
+    const lines = source.split('\n').filter(line => line.trim().length > 0);
+    if (lines.length > 2) {
+      const shortened = lines.slice(0, Math.ceil(lines.length / 2)).join('\n\n');
       setTranslatedText(shortened);
       setDisplayedText(applyToneToDisplay(shortened, tone, format));
+    } else {
+      const sentences = source.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 5);
+      if (sentences.length > 1) {
+        const shortened = sentences.slice(0, Math.ceil(sentences.length / 2)).join(". ") + ".";
+        setTranslatedText(shortened);
+        setDisplayedText(applyToneToDisplay(shortened, tone, format));
+      } else {
+        const shortened = source.slice(0, Math.ceil(source.length / 2)) + "...";
+        setTranslatedText(shortened);
+        setDisplayedText(applyToneToDisplay(shortened, tone, format));
+      }
     }
   };
 
@@ -388,11 +399,11 @@ export const SummaryOutput: React.FC<SummaryOutputProps> = ({
       }
 
       return isList ? (
-        <li key={idx} className="list-disc ml-5 mb-1.5 leading-relaxed text-slate-700 dark:text-slate-300">
+        <li key={idx} className="list-disc ml-5 mb-1.5 leading-relaxed text-main">
           {renderedLine}
         </li>
       ) : content.trim() ? (
-        <p key={idx} className="mb-2.5 leading-relaxed text-slate-700 dark:text-slate-300">
+        <p key={idx} className="mb-2.5 leading-relaxed text-main">
           {renderedLine}
         </p>
       ) : (
@@ -562,6 +573,7 @@ export const SummaryOutput: React.FC<SummaryOutputProps> = ({
               disabled={isTranslating}
               className="bg-transparent text-muted focus:outline-none cursor-pointer text-[10px] font-bold disabled:opacity-50 max-w-[140px]"
             >
+              <option value="original">Original Text</option>
               {ALL_LANGUAGES.map(lang => (
                 <option key={lang.code} value={lang.code}>{lang.label}</option>
               ))}
@@ -668,7 +680,7 @@ export const SummaryOutput: React.FC<SummaryOutputProps> = ({
                   <strong className="text-[11px] text-main">{readingTimeSaved} min</strong>
                 </div>
               )}
-              {selectedLang !== "en" && (
+              {selectedLang !== "original" && selectedLang !== language && (
                 <div className="flex flex-col">
                   <span>Translated To</span>
                   <strong className="text-[11px] text-main truncate">{langLabel.split(" ")[0]}</strong>
@@ -721,7 +733,7 @@ export const SummaryOutput: React.FC<SummaryOutputProps> = ({
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="p-4 bg-surface text-xs text-slate-700 dark:text-slate-300 border-t border-borderToken/40">
+                <div className="p-4 bg-surface text-xs text-main border-t border-borderToken/40">
                   {activeTab === "keywords" && (
                     <div>
                       <p className="text-[10px] text-muted mb-2 font-semibold">Extracted from the source document:</p>

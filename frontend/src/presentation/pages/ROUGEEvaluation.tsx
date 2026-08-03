@@ -90,6 +90,8 @@ export const ROUGEEvaluation: React.FC = () => {
 
   // Status
   const [loading, setLoading] = useState(false);
+  const [loadingGeneration, setLoadingGeneration] = useState(false);
+  const [identicalWarning, setIdenticalWarning] = useState("");
   const [report, setReport] = useState<EvaluationReport | null>(null);
   
   // History & Filters
@@ -126,7 +128,7 @@ export const ROUGEEvaluation: React.FC = () => {
         if (res.data.status === "success" && res.data.summary) {
           const sum = res.data.summary;
           setCandidate(sum.summaryText);
-          setReference(sum.originalText);
+          setReference(sum.originalText); // Prefill reference with original text based on user request
           setOriginalText(sum.originalText);
           setModelUsed(sum.modelUsed);
           setLanguage(sum.language);
@@ -136,6 +138,7 @@ export const ROUGEEvaluation: React.FC = () => {
         } else if (currentDocument) {
           setOriginalText(currentDocument.text);
           setReference(currentDocument.text);
+          setCandidate("");
           setDocumentId(currentDocument.id || "");
           setHasSummaryLoaded(false);
         } else {
@@ -150,16 +153,44 @@ export const ROUGEEvaluation: React.FC = () => {
         if (currentDocument) {
           setOriginalText(currentDocument.text);
           setReference(currentDocument.text);
+          setCandidate("");
         }
       }
     };
     loadLatestSummary();
   }, [currentDocument?.id]);
 
+  
+  const handleGenerateSummary = async () => {
+    if (!originalText.trim()) {
+      toastError("Source text is required to generate a summary.");
+      return;
+    }
+    setLoadingGeneration(true);
+    try {
+      const response = await apiClient.post("/summary/summarize", {
+        text: originalText,
+        model_id: modelUsed,
+        document_id: documentId || null
+      });
+      setCandidate(response.data.summary);
+      success("Generated summary from source text.");
+    } catch (error: any) {
+      toastError("Failed to generate summary.");
+    } finally {
+      setLoadingGeneration(false);
+    }
+  };
+
   const handleEvaluate = async () => {
     if (!candidate.trim() || !reference.trim()) {
       toastError("Candidate and Reference summaries are required.");
       return;
+    }
+    if (candidate.trim().toLowerCase() === reference.trim().toLowerCase()) {
+      setIdenticalWarning("Warning: Reference and generated summaries are identical.");
+    } else {
+      setIdenticalWarning("");
     }
     setLoading(true);
     try {
@@ -337,41 +368,47 @@ export const ROUGEEvaluation: React.FC = () => {
             
             {/* Input Panels */}
             <div className="md:col-span-2 flex flex-col gap-4">
-              {hasSummaryLoaded ? (
-                <>
+
                   <div className="flex flex-wrap gap-4 px-1 text-xs text-muted mb-2">
                     {documentId && <span><strong>Doc ID:</strong> {documentId.slice(0, 8)}...</span>}
                     {language && <span><strong>Language:</strong> {language.toUpperCase()}</span>}
                     {timestamp && <span><strong>Generated:</strong> {new Date(timestamp).toLocaleString()}</span>}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-4">
                     <Card className="p-4 flex flex-col gap-3 bg-surface border border-borderToken">
-                      <span className="text-[10px] font-bold text-muted uppercase">Reference Summary (Original Text)</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-muted uppercase">Source Text</span>
+                      </div>
                       <textarea
-                        value={reference}
-                        onChange={(e) => setReference(e.target.value)}
-                        readOnly
-                        className="w-full min-h-[140px] bg-app border border-borderToken rounded-lg p-3 text-xs text-main focus:outline-none focus:ring-1 focus:ring-primary resize-y opacity-75"
+                        value={originalText}
+                        onChange={(e) => setOriginalText(e.target.value)}
+                        className="w-full min-h-[100px] bg-app border border-borderToken rounded-lg p-3 text-xs text-main focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+                        placeholder="Paste source text here..."
                       />
                     </Card>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <Card className="p-4 flex flex-col gap-3 bg-surface border border-borderToken">
+                        <span className="text-[10px] font-bold text-muted uppercase">Reference Summary (Human)</span>
+                        <textarea
+                          value={reference}
+                          onChange={(e) => setReference(e.target.value)}
+                          className="w-full min-h-[140px] bg-app border border-borderToken rounded-lg p-3 text-xs text-main focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+                          placeholder="Paste human reference summary here..."
+                        />
+                      </Card>
 
-                    <Card className="p-4 flex flex-col gap-3 bg-surface border border-borderToken">
-                      <span className="text-[10px] font-bold text-muted uppercase">AI Generated Summary (Candidate)</span>
-                      <textarea
-                        value={candidate}
-                        onChange={(e) => setCandidate(e.target.value)}
-                        readOnly
-                        className="w-full min-h-[140px] bg-app border border-borderToken rounded-lg p-3 text-xs text-main focus:outline-none focus:ring-1 focus:ring-primary resize-y opacity-75"
-                      />
-                    </Card>
+                      <Card className="p-4 flex flex-col gap-3 bg-surface border border-borderToken">
+                        <span className="text-[10px] font-bold text-muted uppercase">Generated Summary (AI Candidate)</span>
+                        <textarea
+                          value={candidate}
+                          onChange={(e) => setCandidate(e.target.value)}
+                          className="w-full min-h-[140px] bg-app border border-borderToken rounded-lg p-3 text-xs text-main focus:outline-none focus:ring-1 focus:ring-primary resize-y"
+                          placeholder="Generated AI summary will appear here..."
+                        />
+                      </Card>
+                    </div>
                   </div>
-                </>
-              ) : (
-                <Card className="p-8 flex flex-col items-center justify-center gap-3 bg-surface border border-borderToken text-center min-h-[140px]">
-                  <span className="text-sm font-bold text-muted">No generated summary available.</span>
-                  <span className="text-xs text-muted/70">Go to Home or Document Analysis to generate a summary first.</span>
-                </Card>
-              )}
+
 
               <div className="flex justify-between items-center gap-3 bg-slate-50/50 dark:bg-slate-800/10 p-3 rounded-lg border border-borderToken">
                 <div className="flex items-center gap-2 text-xs">
@@ -388,14 +425,26 @@ export const ROUGEEvaluation: React.FC = () => {
                   </select>
                 </div>
 
-                <Button 
-                  onClick={handleEvaluate} 
-                  disabled={loading}
-                  className="text-xs px-5"
-                >
-                  {loading ? <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sliders className="w-3.5 h-3.5 mr-1.5" />}
-                  Evaluate Summaries
-                </Button>
+                <div className="flex gap-3">
+                  <Button 
+                    variant="outline"
+                    onClick={handleGenerateSummary} 
+                    disabled={loadingGeneration}
+                    className="text-xs px-5 border-primary/20 text-primary hover:bg-primary/5"
+                  >
+                    {loadingGeneration ? <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+                    Generate Summary
+                  </Button>
+                  <Button 
+                    onClick={handleEvaluate} 
+                    disabled={loading || !reference.trim()}
+                    className="text-xs px-5"
+                    title={!reference.trim() ? "Enter a reference summary first" : ""}
+                  >
+                    {loading ? <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sliders className="w-3.5 h-3.5 mr-1.5" />}
+                    Evaluate ROUGE
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -403,6 +452,11 @@ export const ROUGEEvaluation: React.FC = () => {
             <div className="md:col-span-1">
               <Card className="p-5 flex flex-col gap-4 bg-surface border border-borderToken h-full justify-between">
                 <div className="flex flex-col gap-4">
+                  {identicalWarning && (
+                    <div className="p-2 mb-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-md text-xs font-bold text-center">
+                      {identicalWarning}
+                    </div>
+                  )}
                   <div className="flex justify-between items-center border-b border-borderToken pb-2">
                     <span className="text-[10px] font-bold text-muted uppercase">Overall Quality Report</span>
                     <Award className="w-4 h-4 text-primary" />

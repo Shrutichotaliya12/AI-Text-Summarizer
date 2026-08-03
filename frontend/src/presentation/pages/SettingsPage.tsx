@@ -455,7 +455,7 @@ export const SettingsPage: React.FC = () => {
   ];
 
   return (
-    <div className="flex flex-col gap-4 max-w-5xl mx-auto w-full text-xs text-slate-700 dark:text-slate-300">
+    <div className="flex flex-col gap-4 max-w-5xl mx-auto w-full text-xs text-main">
       
       {/* Title */}
       <div className="flex items-center justify-between border-b border-borderToken pb-3">
@@ -1231,7 +1231,7 @@ export const SettingsPage: React.FC = () => {
                 </button>
               </div>
 
-              <p className="leading-relaxed text-slate-600 dark:text-slate-300">
+              <p className="leading-relaxed text-muted dark:text-slate-300">
                 Are you sure you want to reset all preferences, accent colors, theme models, shortcuts, and security layouts back to default system values?
               </p>
 

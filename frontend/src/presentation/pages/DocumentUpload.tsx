@@ -1161,7 +1161,7 @@ export const DocumentUpload: React.FC = () => {
                     {previewFile.tags && previewFile.tags.map((tag: any) => (
                       <span 
                         key={tag} 
-                        className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[10px] text-slate-700 dark:text-slate-300 font-semibold"
+                        className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[10px] text-main font-semibold"
                       >
                         {tag}
                         <button onClick={() => handleRemoveTag(tag)} className="text-muted hover:text-danger text-[8px] font-bold">x</button>
@@ -1214,7 +1214,7 @@ export const DocumentUpload: React.FC = () => {
                 {/* Extracted Text Preview area */}
                 <div className="flex flex-col gap-1.5 flex-1 overflow-hidden">
                   <span className="text-[10px] font-bold text-muted uppercase">Extracted Text Content</span>
-                  <div className="flex-1 overflow-y-auto bg-app border border-borderToken rounded-lg p-4 text-xs font-mono leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap select-text min-h-[80px]">
+                  <div className="flex-1 overflow-y-auto bg-app border border-borderToken rounded-lg p-4 text-xs font-mono leading-relaxed text-main whitespace-pre-wrap select-text min-h-[80px]">
                     {isLoadingDocText ? (
                       <div className="flex items-center gap-2 text-muted italic">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />

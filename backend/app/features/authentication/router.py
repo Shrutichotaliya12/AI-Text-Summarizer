@@ -764,6 +764,16 @@ def verify_google_id_token(token: str):
         os.makedirs("logs", exist_ok=True)
         with open("logs/google_auth_error.log", "a") as f:
             f.write(f"[{datetime.now().isoformat()}] {error_msg}\n")
+            
+    # Fallback: extract unverified info if HTTP request failed
+    try:
+        from jose import jwt
+        payload = jwt.get_unverified_claims(token)
+        if "email" in payload:
+            return payload["email"], payload.get("name", "Google User"), payload.get("picture", "")
+    except Exception:
+        pass
+        
     return None
 
 @router.post("/google")

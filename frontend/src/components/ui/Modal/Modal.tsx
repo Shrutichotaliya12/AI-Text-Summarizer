@@ -52,7 +52,7 @@ export const Modal: React.FC<ModalProps> = ({
             </div>
 
             {/* Body */}
-            <div className="text-slate-600 dark:text-slate-300 text-sm">
+            <div className="text-muted dark:text-slate-300 text-sm">
               {children}
             </div>
           </motion.div>

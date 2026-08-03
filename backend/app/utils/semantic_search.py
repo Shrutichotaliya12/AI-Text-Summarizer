@@ -86,7 +86,7 @@ def get_cosine_similarity(vec1: dict, vec2: dict) -> float:
         
     return float(dot_product) / denominator
 
-def score_and_rank_chunks(query: str, chunks_list: list, limit: int = 3) -> list:
+def score_and_rank_chunks(query: str, chunks_list: list, limit: int = 4) -> list:
     """Tokenize query and rank database chunks using Term Frequency vectors similarity."""
     query_tokens = clean_and_tokenize(query)
     if not query_tokens:
@@ -99,9 +99,14 @@ def score_and_rank_chunks(query: str, chunks_list: list, limit: int = 3) -> list
         chunk_tokens = clean_and_tokenize(chunk.text)
         chunk_vector = Counter(chunk_tokens)
         
-        sim = get_cosine_similarity(query_vector, chunk_vector)
-        ranked.append((chunk, sim))
+        # Calculate similarity
+        score = get_cosine_similarity(query_vector, chunk_vector)
+        # Give a small boost if an exact query word appears verbatim
+        if any(qt in chunk.text.lower() for qt in query_tokens):
+            score += 0.05
+            
+        ranked.append((chunk, score))
         
-    # Sort by similarity score descending
+    # Sort by descending score
     ranked.sort(key=lambda x: x[1], reverse=True)
     return ranked[:limit]

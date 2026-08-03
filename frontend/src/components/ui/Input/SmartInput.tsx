@@ -483,7 +483,7 @@ export const SmartInput: React.FC<SmartInputProps> = ({
                 <h3 className="font-bold text-xs font-display">Clear Draft?</h3>
               </div>
 
-              <p className="leading-relaxed text-slate-600 dark:text-slate-300">
+              <p className="leading-relaxed text-muted dark:text-slate-300">
                 Are you sure you want to clear your current draft? This action cannot be undone.
               </p>
 

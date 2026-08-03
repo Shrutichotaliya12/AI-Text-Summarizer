@@ -19,7 +19,7 @@ export function Table<T>({ columns, data, className }: TableProps<T>) {
     <div className={twMerge("w-full overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800", className)}>
       <table className="w-full text-left border-collapse text-sm">
         <thead>
-          <tr className="bg-slate-50 dark:bg-dark-950 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-medium">
+          <tr className="bg-slate-50 dark:bg-dark-950 border-b border-slate-200 dark:border-slate-800 text-muted font-medium">
             {columns.map((column, idx) => (
               <th key={idx} className="p-3 font-semibold">
                 {column.header}
@@ -31,7 +31,7 @@ export function Table<T>({ columns, data, className }: TableProps<T>) {
           {data.map((row, rowIdx) => (
             <tr key={rowIdx} className="hover:bg-slate-50/50 dark:hover:bg-dark-950/40 transition-colors">
               {columns.map((column, colIdx) => (
-                <td key={colIdx} className="p-3 text-slate-700 dark:text-slate-300">
+                <td key={colIdx} className="p-3 text-main">
                   {column.render
                     ? column.render(row)
                     : (row[column.key as keyof T] as unknown as React.ReactNode)}

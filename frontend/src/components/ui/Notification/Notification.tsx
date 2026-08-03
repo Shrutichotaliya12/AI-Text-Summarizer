@@ -24,10 +24,10 @@ export const Notification: React.FC<NotificationProps> = ({
   };
 
   const styleVariants = {
-    success: "bg-success/5 border-success/20 text-slate-800 dark:text-success-200",
-    warning: "bg-warning/5 border-warning/20 text-slate-800 dark:text-warning-200",
-    error: "bg-danger/5 border-danger/20 text-slate-800 dark:text-danger-200",
-    info: "bg-info/5 border-info/20 text-slate-800 dark:text-info-200"
+    success: "bg-success/5 border-success/20 text-main dark:text-success-200",
+    warning: "bg-warning/5 border-warning/20 text-main dark:text-warning-200",
+    error: "bg-danger/5 border-danger/20 text-main dark:text-danger-200",
+    info: "bg-info/5 border-info/20 text-main dark:text-info-200"
   };
 
   return (
@@ -47,7 +47,7 @@ export const Notification: React.FC<NotificationProps> = ({
             {title}
           </span>
         )}
-        <span className="text-slate-600 dark:text-slate-300">
+        <span className="text-muted dark:text-slate-300">
           {message}
         </span>
       </div>

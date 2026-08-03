@@ -19,7 +19,7 @@ export const Card: React.FC<CardProps> = ({
       className={twMerge(
         clsx(
           glass ? "glass-surface" : "bg-surface border-borderToken",
-          "border rounded-lg p-5 shadow-premium overflow-hidden transition-all duration-300",
+          "border rounded-lg p-5 shadow-premium overflow-visible transition-all duration-300",
           hoverGlow && "hover:border-primary/50 hover:shadow-glow",
           className
         )

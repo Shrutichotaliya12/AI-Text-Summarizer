@@ -24,6 +24,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { AIResponseRenderer } from "@/components/ui/AIResponseRenderer";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -253,7 +254,7 @@ export const SummaryHistory: React.FC = () => {
   const comparedItems = summaries.filter(s => selectedForCompare.includes(s.id));
 
   return (
-    <div className="flex flex-col gap-6 select-none text-xs text-slate-700 dark:text-slate-300">
+    <div className="flex flex-col gap-6 select-none text-xs text-main">
       
       {/* Title */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -686,7 +687,7 @@ export const SummaryHistory: React.FC = () => {
                 </button>
               </div>
 
-              <p className="leading-relaxed text-slate-600 dark:text-slate-300">
+              <p className="leading-relaxed text-muted dark:text-slate-300">
                 Are you sure you want to delete this summary? This action cannot be undone.
               </p>
 

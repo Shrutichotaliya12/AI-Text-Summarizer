@@ -27,3 +27,4 @@ markdown>=3.5.1
 beautifulsoup4>=4.12.2
 g4f
 curl_cffi
+reportlab>=4.0.0

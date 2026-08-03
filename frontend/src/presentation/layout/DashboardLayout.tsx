@@ -97,7 +97,7 @@ const RealTimeFooter: React.FC = () => {
   ];
 
   return (
-    <footer className="mt-12 bg-white dark:bg-[#0F172A] border-t border-slate-200 dark:border-[#1E293B] rounded-t-3xl shadow-[0_-4px_25px_-5px_rgba(0,0,0,0.1)] pt-6 pb-6 px-4 w-full transition-colors duration-500 select-none font-sans text-center relative z-10 text-slate-800 dark:text-white backdrop-blur-sm dark:bg-opacity-90">
+    <footer className="mt-12 bg-white dark:bg-[#0F172A] border-t border-slate-200 dark:border-[#1E293B] rounded-t-3xl shadow-[0_-4px_25px_-5px_rgba(0,0,0,0.1)] pt-6 pb-6 px-4 w-full transition-colors duration-500 select-none font-sans text-center relative z-10 text-main dark:text-white backdrop-blur-sm dark:bg-opacity-90">
       <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-4">
         
         {/* TOP ROW: Status */}
@@ -121,12 +121,12 @@ const RealTimeFooter: React.FC = () => {
             return (
               <div key={idx} className="flex flex-col items-center gap-1 transition-transform hover:scale-105 cursor-default group relative">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">{svc.label}:</span>
+                  <span className="font-semibold text-main">{svc.label}:</span>
                   <span className={`h-2.5 w-2.5 rounded-full ${dotColor} ${s.state === "working" ? "animate-pulse" : ""}`}></span>
                   <span className={`${textColor} font-semibold`}>{text}</span>
                 </div>
                 {s.lastChecked && (
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-4 whitespace-nowrap">
+                  <span className="text-[10px] text-slate-400 dark:text-muted font-medium opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-4 whitespace-nowrap">
                     Checked: {s.lastChecked}
                   </span>
                 )}
@@ -136,12 +136,12 @@ const RealTimeFooter: React.FC = () => {
         </div>
 
         {/* MIDDLE ROW: Copyright & Tech Stack */}
-        <div className="text-[13.5px] text-slate-500 dark:text-slate-400 font-medium mt-4">
+        <div className="text-[13.5px] text-muted font-medium mt-4">
           &copy; 2026 AI Text Summarizer Pro &bull; Version 1.0.0
         </div>
 
         {/* BOTTOM ROW: Author */}
-        <div className="text-[13.5px] text-slate-500 dark:text-slate-400 font-medium">
+        <div className="text-[13.5px] text-muted font-medium">
           Designed & Developed by <a href="#" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold hover:underline transition-all">Shruti Chotaliya</a>
         </div>
       </div>
@@ -190,7 +190,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   });
 
   // Pinned page list
-  const [pinnedPaths, setPinnedPaths] = useState<string[]>(["/", "/document-analysis"]);
+  const [pinnedPaths, setPinnedPaths] = useState<string[]>([]);
 
   // Fetch recent files from DB
   const fetchRecentFiles = async () => {

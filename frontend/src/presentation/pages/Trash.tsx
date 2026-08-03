@@ -230,7 +230,7 @@ export const Trash: React.FC = () => {
                 </button>
               </div>
 
-              <p className="leading-relaxed text-slate-600 dark:text-slate-300">
+              <p className="leading-relaxed text-muted dark:text-slate-300">
                 Are you sure you want to permanently delete <strong className="text-main">"{deleteConfirmName}"</strong>? This action is irreversible.
               </p>
 
