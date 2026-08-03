@@ -79,7 +79,7 @@ interface AnalysisData {
     overview?: string;
     structure?: {section: string, level: string, start_page: number, end_page: number, description: string}[];
     takeaways?: {text: string, page: number}[];
-    facts?: {type: string, value: string, context: string, page: number}[];
+    facts?: {type?: string, value?: string, context?: string, page: number, text?: string, fact?: string, description?: string}[];
   };
   readability_scores: {
     fleschReadingEase: number;
@@ -168,9 +168,9 @@ export const DocumentAnalysis: React.FC = () => {
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
 
-  const stats = analysis?.text_statistics || {};
-  const tone = analysis?.sentiment_emotion || {};
-  const entities = analysis?.ner_results || {};
+  const stats = analysis?.text_statistics || ({} as Partial<AnalysisData["text_statistics"]>);
+  const tone = analysis?.sentiment_emotion || ({} as Partial<AnalysisData["sentiment_emotion"]>);
+  const entities = analysis?.ner_results || ({} as Record<string, any>);
   const displayOverview = analysis?.text_statistics?.overview;
   const isOverviewLong = displayOverview && displayOverview.length > 300;
   
@@ -212,7 +212,7 @@ export const DocumentAnalysis: React.FC = () => {
     labels: topicsSeriesLabels,
     legend: { position: 'bottom', labels: { colors: 'inherit' } },
     stroke: { width: 0 },
-    dataLabels: { enabled: true, formatter: function(val) { return Math.round(val) + "%"; } },
+    dataLabels: { enabled: true, formatter: function(val) { return Math.round(Number(val)) + "%"; } },
     tooltip: { theme: 'light' }
   };
 
@@ -397,11 +397,11 @@ export const DocumentAnalysis: React.FC = () => {
                   ))}
                 </select>
                 <Badge variant="primary" className="text-[9px] bg-primary/10 text-primary border-primary/20 tracking-wider">PDF</Badge>
-                <span>Uploaded on {new Date(currentDocument.upload_date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric'})}</span>
+                <span>Uploaded on {new Date(currentDocument.uploadTime).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric'})}</span>
                 <span>•</span>
                 <span>{analysis?.page_count || 0} Pages</span>
                 <span>•</span>
-                <span>{currentDocument.file_size || '0 MB'}</span>
+                <span>{currentDocument.size || '0 MB'}</span>
               </div>
             )}
           </div>
@@ -660,7 +660,7 @@ export const DocumentAnalysis: React.FC = () => {
                        <span>Chapter / Section</span>
                        <span>Page</span>
                      </div>
-                     {stats.structure && stats.structure.length > 0 ? stats.structure.map((item, idx) => (
+                     {stats.structure && stats.structure.length > 0 ? stats.structure.map((item: any, idx: number) => (
                        <div key={idx} className="flex justify-between hover:bg-slate-50 dark:hover:bg-slate-800 p-2 -mx-2 rounded cursor-pointer group" onClick={() => handleViewSource(item.start_page || item.page || 1)}>
                          <span className="font-bold text-main group-hover:text-primary transition-colors">{item.section}</span>
                          <span className="text-muted">p.{item.start_page || item.page || ""}</span>
@@ -682,7 +682,7 @@ export const DocumentAnalysis: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex flex-col gap-4">
-                      {stats.takeaways && stats.takeaways.length > 0 ? stats.takeaways.map((takeaway, idx) => (
+                      {stats.takeaways && stats.takeaways.length > 0 ? stats.takeaways.map((takeaway: any, idx: number) => (
                         <div key={idx} className="flex gap-3 items-start group">
                           <span className="flex items-center justify-center bg-primary/10 text-primary font-black text-[10px] w-5 h-5 rounded-full mt-0.5 shrink-0">
                             {idx + 1}
