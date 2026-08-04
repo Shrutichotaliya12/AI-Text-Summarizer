@@ -4,7 +4,7 @@
 
 ### Enterprise-Grade AI Document Intelligence Platform
 
-[![CI/CD](https://github.com/yourusername/ai-text-summarizer-pro/actions/workflows/deploy.yml/badge.svg)](https://github.com/yourusername/ai-text-summarizer-pro/actions)
+[![CI/CD](https://github.com/Shrutichotaliya12/AI-Text-Summarizer/actions/workflows/deploy.yml/badge.svg)](https://github.com/Shrutichotaliya12/AI-Text-Summarizer/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](https://python.org)
@@ -12,7 +12,7 @@
 
 **AI Text Summarizer Pro** is a full-stack, production-ready AI platform for intelligent document understanding, text summarization, ROUGE evaluation, and multi-document chat — built with FastAPI, React 19, and state-of-the-art HuggingFace NLP models.
 
-[Live Demo](http://localhost:3000) · [API Docs](http://localhost:8000/docs) · [Report Bug](https://github.com/yourusername/ai-text-summarizer-pro/issues) · [Request Feature](https://github.com/yourusername/ai-text-summarizer-pro/issues)
+[Live Demo](http://localhost:3000) · [API Docs](https://ai-text-summarizer-backend-qpqk.onrender.com/docs) · [Report Bug](https://github.com/Shrutichotaliya12/AI-Text-Summarizer/issues) · [Request Feature](https://github.com/Shrutichotaliya12/AI-Text-Summarizer/issues)
 
 </div>
 
@@ -84,8 +84,8 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/ai-text-summarizer-pro.git
-cd ai-text-summarizer-pro
+git clone https://github.com/Shrutichotaliya12/AI-Text-Summarizer.git
+cd AI-Text-Summarizer
 
 # Copy and configure environment
 cp backend/.env.example backend/.env
@@ -265,6 +265,13 @@ npm run build
 MIT License — see [LICENSE](LICENSE) for details.
 
 ---
+
+---
+
+## 👩‍💻 Author
+
+**Shruti Chotaliya**
+- GitHub: [@Shrutichotaliya12](https://github.com/Shrutichotaliya12)
 
 ## 🎓 Academic Note
 
