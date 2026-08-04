@@ -10,8 +10,7 @@ passlib[pbkdf2-sha256]>=1.7.4
 python-multipart>=0.0.9
 celery>=5.3.6
 redis>=5.0.3
-torch>=2.2.1 --index-url https://download.pytorch.org/whl/cpu
-transformers>=4.38.2
+
 alembic>=1.13.1
 gunicorn>=21.2.0
 pytest>=8.0.2
