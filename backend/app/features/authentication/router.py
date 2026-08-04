@@ -314,10 +314,13 @@ def send_real_email(to_email: str, subject: str, html_body: str, text_body: str 
             logger.error(f"Email delivery failed to {to_email}: {e2}")
             
     # AUDIT LOGGING without OTP values
-    os.makedirs(os.path.dirname("logs/email_audit.log"), exist_ok=True)
-    with open("logs/email_audit.log", "a") as f:
-        timestamp = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
-        f.write(f"[{timestamp}] Type: '{subject}' | Recipient: {to_email} | Status: {status}\n")
+    try:
+        os.makedirs(os.path.dirname("logs/email_audit.log"), exist_ok=True)
+        with open("logs/email_audit.log", "a") as f:
+            timestamp = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+            f.write(f"[{timestamp}] Type: '{subject}' | Recipient: {to_email} | Status: {status}\n")
+    except OSError:
+        pass # Skip if read-only
 
 def check_otp_resend_limit(user: User):
     if user.otp_sent_at:
@@ -755,15 +758,21 @@ def verify_google_id_token(token: str):
         error_body = e.read().decode()
         error_msg = f"Google Token Verification HTTPError {e.code}: {error_body}"
         print(error_msg)
-        os.makedirs("logs", exist_ok=True)
-        with open("logs/google_auth_error.log", "a") as f:
-            f.write(f"[{datetime.now().isoformat()}] {error_msg}\n")
+        try:
+            os.makedirs("logs", exist_ok=True)
+            with open("logs/google_auth_error.log", "a") as f:
+                f.write(f"[{datetime.now().isoformat()}] {error_msg}\n")
+        except OSError:
+            pass
     except Exception as e:
         error_msg = f"Google Token Verification Exception: {e}"
         print(error_msg)
-        os.makedirs("logs", exist_ok=True)
-        with open("logs/google_auth_error.log", "a") as f:
-            f.write(f"[{datetime.now().isoformat()}] {error_msg}\n")
+        try:
+            os.makedirs("logs", exist_ok=True)
+            with open("logs/google_auth_error.log", "a") as f:
+                f.write(f"[{datetime.now().isoformat()}] {error_msg}\n")
+        except OSError:
+            pass
             
     # Fallback: extract unverified info if HTTP request failed
     try:

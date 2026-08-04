@@ -573,7 +573,13 @@ def trigger_backup(request: Request, db: Session = Depends(get_db), current_user
         raise HTTPException(status_code=500, detail="Database file not found.")
 
     backups_dir = os.path.join(backend_dir, "backups")
-    os.makedirs(backups_dir, exist_ok=True)
+    try:
+        os.makedirs(backups_dir, exist_ok=True)
+    except OSError:
+        import tempfile
+        backups_dir = os.path.join(tempfile.gettempdir(), "saas_summarizer_backups")
+        os.makedirs(backups_dir, exist_ok=True)
+        
     filename = f"backup_{datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y%m%d_%H%M%S')}.db"
     dest = os.path.join(backups_dir, filename)
 

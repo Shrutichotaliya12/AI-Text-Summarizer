@@ -944,7 +944,7 @@ export const Auth: React.FC = () => {
                     <AuthButton
                       variant="outline"
                       icon={<Chrome className="w-4 h-4" style={{ color: "rgb(239, 68, 68)" }} />}
-                      onClick={() => handleLogin({ preventDefault: () => {} } as any)}
+                      onClick={() => toastError("Google Login is not configured on this environment.")}
                     >
                       Continue with Google
                     </AuthButton>
@@ -1073,7 +1073,7 @@ export const Auth: React.FC = () => {
                     <AuthButton
                       variant="outline"
                       icon={<Chrome className="w-4 h-4" style={{ color: "rgb(239, 68, 68)" }} />}
-                      onClick={() => handleLogin({ preventDefault: () => {} } as any)}
+                      onClick={() => toastError("Google Login is not configured on this environment.")}
                     >
                       Continue with Google
                     </AuthButton>

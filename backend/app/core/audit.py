@@ -2,13 +2,34 @@ import hashlib
 import json
 import logging
 import os
+import sys
+import tempfile
 from datetime import datetime, timezone
 from fastapi import Request
 from app.shared.models import User
 
-# Ensure logs directory exists
-LOGS_DIR = os.path.join(os.getcwd(), "logs")
-os.makedirs(LOGS_DIR, exist_ok=True)
+# Ensure logs directory exists safely
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+
+def setup_logs_dir():
+    primary_dir = os.path.join(os.getcwd(), "logs")
+    if ENVIRONMENT == "production":
+        primary_dir = os.path.join(tempfile.gettempdir(), "ai-text-summarizer", "logs")
+        
+    try:
+        os.makedirs(primary_dir, exist_ok=True)
+        return primary_dir
+    except OSError:
+        pass
+        
+    try:
+        fallback = os.path.join(tempfile.gettempdir(), "logs")
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+    except OSError:
+        return None
+
+LOGS_DIR = setup_logs_dir()
 
 def get_audit_logger(name: str, filename: str):
     logger = logging.getLogger(name)
@@ -16,9 +37,23 @@ def get_audit_logger(name: str, filename: str):
     logger.propagate = False
     
     if not logger.handlers:
-        fh = logging.FileHandler(os.path.join(LOGS_DIR, filename))
-        fh.setFormatter(logging.Formatter('%(message)s'))
-        logger.addHandler(fh)
+        formatter = logging.Formatter('%(message)s')
+        handler_added = False
+        
+        if LOGS_DIR is not None:
+            try:
+                fh = logging.FileHandler(os.path.join(LOGS_DIR, filename))
+                fh.setFormatter(formatter)
+                logger.addHandler(fh)
+                handler_added = True
+            except OSError:
+                pass
+                
+        if not handler_added:
+            sh = logging.StreamHandler(sys.stdout)
+            sh.setFormatter(formatter)
+            logger.addHandler(sh)
+            
     return logger
 
 otp_logger = get_audit_logger("otp_audit", "otp_audit.log")

@@ -31,6 +31,8 @@ def get_logger(name: str):
             file_handler = logging.FileHandler("logs/app.log", encoding="utf-8")
             file_handler.setFormatter(JSONFormatter())
             logger.addHandler(file_handler)
+        except OSError:
+            pass # Skip file logging if filesystem is read-only
         except Exception as e:
             print(f"Failed to initialize file logger: {e}")
             
