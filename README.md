@@ -12,7 +12,7 @@
 
 **AI Text Summarizer Pro** is a full-stack, production-ready AI platform for intelligent document understanding, text summarization, ROUGE evaluation, and multi-document chat — built with FastAPI, React 19, and state-of-the-art HuggingFace NLP models.
 
-[Live Demo](http://localhost:3000) · [API Docs](https://ai-text-summarizer-backend-qpqk.onrender.com/docs) · [Report Bug](https://github.com/Shrutichotaliya12/AI-Text-Summarizer/issues) · [Request Feature](https://github.com/Shrutichotaliya12/AI-Text-Summarizer/issues)
+[Live Demo](https://ai-text-summarizer-xi.vercel.app) · [API Docs](https://ai-text-summarizer-backend-qpqk.onrender.com/docs) · [Report Bug](https://github.com/Shrutichotaliya12/AI-Text-Summarizer/issues) · [Request Feature](https://github.com/Shrutichotaliya12/AI-Text-Summarizer/issues)
 
 </div>
 
