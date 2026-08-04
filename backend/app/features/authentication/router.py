@@ -757,7 +757,6 @@ def verify_google_id_token(token: str):
             data = json.loads(response.read().decode())
             if "email" in data:
                 return data["email"], data.get("name", "Google User"), data.get("picture", "")
-    primary_error = "Unknown"
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
         error_msg = f"HTTPError {e.code}: {error_body}"
