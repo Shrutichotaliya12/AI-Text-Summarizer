@@ -528,13 +528,13 @@ def login(user: UserLogin, response: Response, request: Request = None, db: Sess
     if not db_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect Email or Password"
+            detail="Aapka account nahi hai. Please create an account."
         )
 
     if not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect Email or Password",
+            detail="Incorrect Password",
             headers={"WWW-Authenticate": "Bearer"},
         )
         
