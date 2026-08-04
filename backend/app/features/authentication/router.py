@@ -746,6 +746,9 @@ def verify_google_id_token(token: str):
     import ssl
     import urllib.error
     import os
+    
+    primary_error = "None"
+    fallback_error = "None"
     try:
         url = f"https://oauth2.googleapis.com/tokeninfo?id_token={token}"
         req = urllib.request.Request(url)
@@ -754,9 +757,11 @@ def verify_google_id_token(token: str):
             data = json.loads(response.read().decode())
             if "email" in data:
                 return data["email"], data.get("name", "Google User"), data.get("picture", "")
+    primary_error = "Unknown"
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
-        error_msg = f"Google Token Verification HTTPError {e.code}: {error_body}"
+        error_msg = f"HTTPError {e.code}: {error_body}"
+        primary_error = error_msg
         print(error_msg)
         try:
             os.makedirs("logs", exist_ok=True)
@@ -765,7 +770,8 @@ def verify_google_id_token(token: str):
         except OSError:
             pass
     except Exception as e:
-        error_msg = f"Google Token Verification Exception: {e}"
+        error_msg = f"Exception: {e}"
+        primary_error = error_msg
         print(error_msg)
         try:
             os.makedirs("logs", exist_ok=True)
@@ -780,10 +786,10 @@ def verify_google_id_token(token: str):
         payload = jwt.get_unverified_claims(token)
         if "email" in payload:
             return payload["email"], payload.get("name", "Google User"), payload.get("picture", "")
-    except Exception:
-        pass
+    except Exception as e:
+        fallback_error = str(e)
         
-    return None
+    return None, f"Primary error: {primary_error}, Fallback error: {fallback_error}"
 
 @router.post("/google")
 def google_oauth(payload: OAuthPayload, db: Session = Depends(get_db)):
@@ -794,12 +800,13 @@ def google_oauth(payload: OAuthPayload, db: Session = Depends(get_db)):
     # Verify real ID token from Google Identity Services if provided
     if payload.token and payload.token != "mock_oauth_jwt_token":
         result = verify_google_id_token(payload.token)
-        if result:
+        if isinstance(result, tuple) and len(result) == 3 and result[0] is not None:
             email, name, picture = result
         else:
+            error_details = result[1] if isinstance(result, tuple) else "Unknown error"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Google token verification failed. Please ensure your Google account is authorized."
+                detail=f"Google token verification failed: {error_details}"
             )
 
     db_user = db.query(User).filter(User.email == email).first()
