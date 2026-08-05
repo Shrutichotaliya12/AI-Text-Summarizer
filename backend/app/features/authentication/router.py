@@ -132,6 +132,17 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
+def for_update_query(query, db: Session):
+    """Apply SELECT FOR UPDATE only when the DB supports it (PostgreSQL).
+    SQLite does not support FOR UPDATE and will raise an error."""
+    try:
+        dialect = db.get_bind().dialect.name
+        if dialect == "postgresql":
+            return query.with_for_update()
+    except Exception:
+        pass
+    return query
+
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     if expires_delta:
@@ -264,19 +275,19 @@ def send_real_email(to_email: str, subject: str, html_body: str, text_body: str 
     print(f"Recipient: {to_email}")
     print(f"Subject: {subject}")
     
-    if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+    if not settings.SMTP_HOST or not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
         print("[OTP SMTP INFO] SMTP credentials not set. Simulated success.")
         return
         
-    if settings.ENVIRONMENT == "production" and settings.SMTP_USER != "textsummarizer.ai@gmail.com":
-        error_msg = f"[SMTP SECURITY] Refusing to send from unauthorized email in production: {settings.SMTP_USER}"
+    if settings.ENVIRONMENT == "production" and settings.SMTP_USERNAME != "textsummarizer.ai@gmail.com":
+        error_msg = f"[SMTP SECURITY] Refusing to send from unauthorized email in production: {settings.SMTP_USERNAME}"
         print(error_msg)
         logger.error(error_msg)
         return
         
     msg = MIMEMultipart("alternative")
     msg['Subject'] = subject
-    msg['From'] = settings.SMTP_FROM_EMAIL
+    msg['From'] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
     msg['To'] = to_email
     
     msg_id = f"<{time.time()}-{random.randint(100000, 999999)}@summarizer.pro>"
@@ -292,8 +303,9 @@ def send_real_email(to_email: str, subject: str, html_body: str, text_body: str 
 
     def attempt_delivery():
         server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
-        server.starttls()
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        if settings.SMTP_USE_TLS:
+            server.starttls()
+        server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
         server.sendmail(settings.SMTP_FROM_EMAIL, [to_email], msg.as_string())
         server.quit()
         
@@ -302,16 +314,9 @@ def send_real_email(to_email: str, subject: str, html_body: str, text_body: str 
         status = "Success"
         print("SMTP Send successful.")
     except Exception as e:
-        print(f"[SMTP RETRY] Temporary failure: {e}. Retrying once...")
-        try:
-            time.sleep(1)
-            attempt_delivery()
-            status = "Success (after retry)"
-            print("SMTP Send successful on retry.")
-        except Exception as e2:
-            status = f"Failed: {e2}"
-            print(f"[SMTP ERROR] Final failure: {e2}")
-            logger.error(f"Email delivery failed to {to_email}: {e2}")
+        status = f"Failed: {e}"
+        print(f"[SMTP ERROR] Final failure: {e}")
+        logger.error(f"Email delivery failed to {to_email}: {e}")
             
     # AUDIT LOGGING without OTP values
     try:
@@ -450,12 +455,17 @@ def verify_otp(payload: OtpVerifyRequest, response: Response, request: Request =
         db.refresh(profile)
         
         # Send Welcome HTML Email
-        try:
-            profile_name = profile.name or user.email.split("@")[0].capitalize()
-            welcome_html = get_welcome_email_html(profile_name)
-            send_real_email(user.email, "Welcome to AI Text Summarizer Pro!", welcome_html)
-        except Exception as e:
-            print(f"Failed to send welcome email: {e}")
+        locked_user = for_update_query(db.query(User).filter(User.id == user.id), db).first()
+        if locked_user and not locked_user.welcome_email_sent:
+            locked_user.welcome_email_sent = True
+            locked_user.welcome_email_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.commit()
+            try:
+                profile_name = profile.name or user.email.split("@")[0].capitalize()
+                welcome_html = get_welcome_email_html(profile_name)
+                send_real_email(user.email, "Welcome to AI Text Summarizer Pro!", welcome_html)
+            except Exception as e:
+                print(f"Failed to send welcome email: {e}")
             
         token = create_access_token({"sub": user.email})
         
@@ -877,7 +887,7 @@ def get_google_client_id():
 
 @router.post("/resend-otp")
 def resend_otp(payload: ResendOtpRequest, request: Request, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = for_update_query(db.query(User).filter(User.email == payload.email), db).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -914,7 +924,7 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Sessio
     print("\n[FORGOT PASSWORD FLOW] 1. POST /auth/forgot-password API request received.")
     print(f"[FORGOT PASSWORD FLOW] Recipient email: {payload.email}")
     
-    user = db.query(User).filter(User.email == payload.email).first()
+    user = for_update_query(db.query(User).filter(User.email == payload.email), db).first()
     if not user:
         print("[FORGOT PASSWORD FLOW] Error: Email not found in database.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account Not Found")

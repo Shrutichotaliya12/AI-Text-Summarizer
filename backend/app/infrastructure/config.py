@@ -1,6 +1,6 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, AliasChoices
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "AI Text Summarizer Pro"
@@ -49,9 +49,11 @@ class Settings(BaseSettings):
     # SMTP Configuration
     SMTP_HOST: str = Field(default="", validation_alias="SMTP_HOST")
     SMTP_PORT: int = Field(default=587, validation_alias="SMTP_PORT")
-    SMTP_USER: str = Field(default="", validation_alias="SMTP_USER")
+    SMTP_USERNAME: str = Field(default="", validation_alias=AliasChoices("SMTP_USERNAME", "SMTP_USER"))
     SMTP_PASSWORD: str = Field(default="", validation_alias="SMTP_PASSWORD")
-    SMTP_FROM_EMAIL: str = Field(default="AI Text Summarizer Pro <textsummarizer.ai@gmail.com>", validation_alias="SMTP_FROM_EMAIL")
+    SMTP_FROM_EMAIL: str = Field(default="textsummarizer.ai@gmail.com", validation_alias="SMTP_FROM_EMAIL")
+    SMTP_FROM_NAME: str = Field(default="AI Text Summarizer Pro", validation_alias="SMTP_FROM_NAME")
+    SMTP_USE_TLS: bool = Field(default=True, validation_alias="SMTP_USE_TLS")
 
     @field_validator("JWT_SECRET")
     @classmethod

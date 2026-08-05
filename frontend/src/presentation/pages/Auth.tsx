@@ -738,7 +738,7 @@ export const Auth: React.FC = () => {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || isLoading) return;
 
     setIsLoading(true);
     try {
@@ -786,7 +786,7 @@ export const Auth: React.FC = () => {
   };
 
   const handleResendOtp = async () => {
-    if (resendCountdown > 0) return;
+    if (resendCountdown > 0 || isLoading) return;
     setIsLoading(true);
     try {
       await apiClient.post("/auth/resend-otp", {
@@ -1287,7 +1287,7 @@ export const Auth: React.FC = () => {
                   </div>
                   <button
                     type="button"
-                    disabled={resendCountdown > 0}
+                    disabled={resendCountdown > 0 || isLoading}
                     onClick={handleResendOtp}
                     className="text-[11px] font-semibold hover:underline underline-offset-2 disabled:opacity-40 disabled:no-underline transition-opacity"
                     style={{ color: "rgb(var(--primary))" }}

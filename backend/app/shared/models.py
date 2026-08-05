@@ -17,6 +17,8 @@ class User(Base):
     otp_secret = Column(String, nullable=True)
     otp_expiry = Column(DateTime, nullable=True)
     otp_sent_at = Column(DateTime, nullable=True)
+    welcome_email_sent = Column(Boolean, default=False)
+    welcome_email_sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Relationships
