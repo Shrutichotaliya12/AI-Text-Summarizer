@@ -749,6 +749,7 @@ def verify_google_id_token(token: str):
     
     primary_error = "None"
     fallback_error = "None"
+    
     try:
         url = f"https://oauth2.googleapis.com/tokeninfo?id_token={token}"
         req = urllib.request.Request(url)
@@ -766,7 +767,7 @@ def verify_google_id_token(token: str):
             os.makedirs("logs", exist_ok=True)
             with open("logs/google_auth_error.log", "a") as f:
                 f.write(f"[{datetime.now().isoformat()}] {error_msg}\n")
-        except OSError:
+        except Exception:
             pass
     except Exception as e:
         error_msg = f"Exception: {e}"
@@ -776,7 +777,7 @@ def verify_google_id_token(token: str):
             os.makedirs("logs", exist_ok=True)
             with open("logs/google_auth_error.log", "a") as f:
                 f.write(f"[{datetime.now().isoformat()}] {error_msg}\n")
-        except OSError:
+        except Exception:
             pass
             
     # Fallback: extract unverified info if HTTP request failed
