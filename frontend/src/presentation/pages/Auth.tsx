@@ -562,8 +562,12 @@ export const Auth: React.FC = () => {
                   setIsLoading(true);
                   try {
                     const authRes = await apiClient.post("/auth/google", { token: response.credential });
-                    const { access_token, email: userEmail } = authRes.data;
-                    success("Welcome Back");
+                    const { access_token, email: userEmail, is_new_user } = authRes.data;
+                    if (is_new_user) {
+                      success("Account created successfully! Welcome to AI Text Summarizer Pro.");
+                    } else {
+                      success("Welcome Back");
+                    }
                     setTimeout(() => {
                       login({ email: userEmail }, access_token);
                     }, 1000);
@@ -635,8 +639,10 @@ export const Auth: React.FC = () => {
       const status = err.response?.status;
 
       if (status === 404) {
+        toastError(detail || "Aapka account nahi hai. Please create an account.");
         setCurrentScreen("account_not_found");
       } else if (status === 401) {
+        toastError(detail || "Incorrect Password. Please try again.");
         setCurrentScreen("wrong_password");
       } else if (status === 403 && detail === "Email verification required") {
         setActiveAction("signup");

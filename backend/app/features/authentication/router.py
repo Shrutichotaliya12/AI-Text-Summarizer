@@ -537,7 +537,7 @@ def login(user: UserLogin, response: Response, request: Request = None, db: Sess
 
     if not db_user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Aapka account nahi hai. Please create an account."
         )
 
@@ -820,7 +820,9 @@ def google_oauth(payload: OAuthPayload, db: Session = Depends(get_db)):
             )
 
     db_user = db.query(User).filter(User.email == email).first()
+    is_new_user = False
     if not db_user:
+        is_new_user = True
         hashed = hash_password(secrets.token_hex(16))
         db_user = User(email=email, hashed_password=hashed, is_verified=True)
         db.add(db_user)
@@ -832,6 +834,18 @@ def google_oauth(payload: OAuthPayload, db: Session = Depends(get_db)):
         db.add(profile)
         db.add(settings_payload)
         db.commit()
+        
+        # Send Welcome HTML Email for new Google user
+        if not db_user.welcome_email_sent:
+            db_user.welcome_email_sent = True
+            db_user.welcome_email_sent_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.commit()
+            try:
+                profile_name = name or email.split("@")[0].capitalize()
+                welcome_html = get_welcome_email_html(profile_name)
+                send_real_email(db_user.email, "Welcome to AI Text Summarizer Pro!", welcome_html)
+            except Exception as e:
+                print(f"Failed to send Google welcome email: {e}")
     else:
         # Update existing profile with google info if not already set
         profile = db.query(Profile).filter(Profile.user_id == db_user.id).first()
@@ -850,7 +864,8 @@ def google_oauth(payload: OAuthPayload, db: Session = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "email": db_user.email
+        "email": db_user.email,
+        "is_new_user": is_new_user
     }
 
 @router.post("/github")
