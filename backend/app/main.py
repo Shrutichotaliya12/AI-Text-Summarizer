@@ -32,10 +32,8 @@ from app.features.system.router import router as system_router
 from app.shared.database import Base, engine
 from app.shared import models
 
-try:
-    Base.metadata.create_all(bind=engine)
-except Exception as e:
-    logger.error(f"DB auto-initialization exception: {e}")
+# Database schema initialization is now handled safely by init_db.py
+# before multiple workers are spawned.
 
 
 # ─── In-memory sliding window rate limiter ───────────────────────────────────

@@ -1,5 +1,5 @@
 import os
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 
 class Settings(BaseSettings):
@@ -67,8 +67,9 @@ class Settings(BaseSettings):
             return ["*"]
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
 
-    class Config:
-        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"),
+        extra="ignore"
+    )
 
 settings = Settings()
